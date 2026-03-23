@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f7;
+  --foreground: #3c3c3c;
+  --duo-green: #58cc02;
+  --duo-green-dark: #419902;
+  --duo-green-shadow: #46a302;
+  --duo-blue: #1cb0f6;
+  --duo-blue-shadow: #1899d6;
+  --duo-gold: #ffc800;
+  --duo-border: #e5e5e5;
+  --duo-surface: #f0f0f0;
+  --duo-text: #3c3c3c;
+  --duo-text-muted: #777777;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-nunito);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.duo-btn-primary {
+  border-radius: 1rem;
+  border-bottom: 4px solid var(--duo-green-shadow);
+  background-color: var(--duo-green);
+  font-weight: 800;
+  color: white;
+  transition: transform 0.05s ease, border-bottom-width 0.05s ease;
+}
+
+.duo-btn-primary:hover {
+  filter: brightness(1.03);
+}
+
+.duo-btn-primary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
