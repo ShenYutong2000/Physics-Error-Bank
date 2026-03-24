@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
-import { getAuthSecret, getExpectedCredentials } from "@/lib/auth-config";
-import { normalizeEmail } from "@/lib/auth-validation";
-import { verifyRegisteredUser } from "@/lib/user-store";
+import { getAuthSecret } from "@/lib/auth-config";
+import { isValidEmail, MIN_PASSWORD_LENGTH, normalizeEmail } from "@/lib/auth-validation";
+import { createRegisteredUser } from "@/lib/user-store";
 
 export const runtime = "nodejs";
 
@@ -21,6 +21,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
 
+  if (!isValidEmail(email)) {
+    return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  }
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return NextResponse.json(
+      { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
+      { status: 400 },
+    );
+  }
+
   const secret = getAuthSecret();
   if (!secret) {
     return NextResponse.json(
@@ -29,15 +40,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const registeredOk = await verifyRegisteredUser(email, password);
-  if (registeredOk) {
-    return jsonResponseWithSession(email, secret);
+  const created = await createRegisteredUser(email, password);
+  if (!created.ok) {
+    return NextResponse.json({ error: created.error }, { status: 409 });
   }
 
-  const creds = getExpectedCredentials();
-  if (creds && email === creds.email.toLowerCase() && password === creds.password) {
-    return jsonResponseWithSession(email, secret);
-  }
-
-  return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+  return jsonResponseWithSession(email, secret);
 }
