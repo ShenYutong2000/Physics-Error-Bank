@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local registered users (do not commit)
 /data/users.json
+
+# uploaded mistake images (local object storage)
+/data/uploads/

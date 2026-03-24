@@ -9,14 +9,20 @@ import {
   useState,
 } from "react";
 import type { MistakeEntry } from "@/lib/types";
-import { loadMistakes, saveMistakes } from "@/lib/mistakes-storage";
+
+type AddMistakeInput = {
+  file: File;
+  tags: string[];
+  notes: string;
+};
 
 type MistakesContextValue = {
   mistakes: MistakeEntry[];
-  addMistake: (entry: Omit<MistakeEntry, "id" | "createdAt">) => void;
-  removeMistake: (id: string) => void;
-  updateMistake: (id: string, patch: Partial<MistakeEntry>) => void;
+  addMistake: (input: AddMistakeInput) => Promise<{ ok: boolean; error?: string }>;
+  removeMistake: (id: string) => Promise<void>;
   ready: boolean;
+  loadError: string | null;
+  saving: boolean;
 };
 
 const MistakesContext = createContext<MistakesContextValue | null>(null);
@@ -24,41 +30,87 @@ const MistakesContext = createContext<MistakesContextValue | null>(null);
 export function MistakesProvider({ children }: { children: React.ReactNode }) {
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setMistakes(loadMistakes());
-    setReady(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/mistakes", { credentials: "include" });
+        if (cancelled) return;
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          setLoadError(
+            data.error ??
+              (res.status === 503
+                ? "Database is not configured (DATABASE_URL)."
+                : "Could not load your library."),
+          );
+          setMistakes([]);
+          setReady(true);
+          return;
+        }
+        const data = (await res.json()) as { mistakes: MistakeEntry[] };
+        setMistakes(Array.isArray(data.mistakes) ? data.mistakes : []);
+        setLoadError(null);
+      } catch {
+        if (!cancelled) {
+          setLoadError("Could not load your library.");
+          setMistakes([]);
+        }
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-    saveMistakes(mistakes);
-  }, [mistakes, ready]);
-
-  const addMistake = useCallback(
-    (entry: Omit<MistakeEntry, "id" | "createdAt">) => {
-      const id =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const full: MistakeEntry = {
-        ...entry,
-        id,
-        createdAt: new Date().toISOString(),
+  const addMistake = useCallback(async (input: AddMistakeInput) => {
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.set("image", input.file);
+      fd.set("notes", input.notes);
+      fd.set("tags", JSON.stringify(input.tags));
+      const res = await fetch("/api/mistakes", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        mistake?: MistakeEntry;
+        error?: string;
       };
-      setMistakes((prev) => [full, ...prev]);
-    },
-    [],
-  );
-
-  const removeMistake = useCallback((id: string) => {
-    setMistakes((prev) => prev.filter((m) => m.id !== id));
+      if (!res.ok) {
+        return { ok: false as const, error: data.error ?? "Could not save mistake." };
+      }
+      if (data.mistake) {
+        setMistakes((prev) => [data.mistake!, ...prev]);
+        setLoadError(null);
+      }
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const, error: "Network error while saving." };
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
-  const updateMistake = useCallback((id: string, patch: Partial<MistakeEntry>) => {
-    setMistakes((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-    );
+  const removeMistake = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/mistakes/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setMistakes((prev) => prev.filter((m) => m.id !== id));
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const value = useMemo(
@@ -66,10 +118,11 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       mistakes,
       addMistake,
       removeMistake,
-      updateMistake,
       ready,
+      loadError,
+      saving,
     }),
-    [mistakes, addMistake, removeMistake, updateMistake, ready],
+    [mistakes, addMistake, removeMistake, ready, loadError, saving],
   );
 
   return (

@@ -1,6 +1,7 @@
 export type MistakeEntry = {
   id: string;
-  imageDataUrl: string;
+  /** Public URL path (e.g. /api/mistake-files/...) for <img src>. */
+  imageUrl: string;
   tags: string[];
   notes: string;
   createdAt: string;

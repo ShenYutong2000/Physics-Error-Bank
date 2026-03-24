@@ -7,14 +7,23 @@ import { PRESET_TAGS } from "@/lib/types";
 
 export default function AddMistakePage() {
   const router = useRouter();
-  const { addMistake, ready } = useMistakes();
+  const { addMistake, ready, saving, loadError } = useMistakes();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedFileRef = useRef<File | null>(null);
 
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const clearPreview = useCallback(() => {
+    if (previewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    selectedFileRef.current = null;
+  }, [previewUrl]);
 
   const onFile = useCallback((file: File | null) => {
     setError(null);
@@ -23,12 +32,11 @@ export default function AddMistakePage() {
       setError("Please choose an image file.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const r = reader.result;
-      if (typeof r === "string") setImageDataUrl(r);
-    };
-    reader.readAsDataURL(file);
+    setPreviewUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    selectedFileRef.current = file;
   }, []);
 
   const togglePreset = (t: string) => {
@@ -44,9 +52,10 @@ export default function AddMistakePage() {
     setCustomTag("");
   };
 
-  const submit = () => {
+  const submit = async () => {
     setError(null);
-    if (!imageDataUrl) {
+    const file = selectedFileRef.current;
+    if (!file) {
       setError("Take a photo or upload an image of the problem first.");
       return;
     }
@@ -54,8 +63,12 @@ export default function AddMistakePage() {
       setError("Pick at least one tag.");
       return;
     }
-    addMistake({ imageDataUrl, tags, notes: notes.trim() });
-    setImageDataUrl(null);
+    const result = await addMistake({ file, tags, notes: notes.trim() });
+    if (!result.ok) {
+      setError(result.error ?? "Could not save.");
+      return;
+    }
+    clearPreview();
     setTags([]);
     setNotes("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -72,6 +85,11 @@ export default function AddMistakePage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+      {loadError && (
+        <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60]">
+          {loadError}
+        </p>
+      )}
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-green-dark)]">
           Today’s mistakes
@@ -103,12 +121,12 @@ export default function AddMistakePage() {
             <span aria-hidden>📷</span>
             Camera / upload
           </label>
-          {imageDataUrl && (
+          {previewUrl && (
             <button
               type="button"
               className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-2 text-sm font-bold text-[var(--duo-text)]"
               onClick={() => {
-                setImageDataUrl(null);
+                clearPreview();
                 if (fileInputRef.current) fileInputRef.current.value = "";
               }}
             >
@@ -116,11 +134,11 @@ export default function AddMistakePage() {
             </button>
           )}
         </div>
-        {imageDataUrl && (
+        {previewUrl && (
           <div className="mt-4 overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={imageDataUrl}
+              src={previewUrl}
               alt="Preview of the problem"
               className="max-h-64 w-full object-contain"
             />
@@ -191,8 +209,13 @@ export default function AddMistakePage() {
         </p>
       )}
 
-      <button type="button" onClick={submit} className="duo-btn-primary w-full py-4 text-lg">
-        Save to library
+      <button
+        type="button"
+        onClick={() => void submit()}
+        disabled={saving}
+        className="duo-btn-primary w-full py-4 text-lg disabled:opacity-60"
+      >
+        {saving ? "Saving…" : "Save to library"}
       </button>
     </div>
   );
