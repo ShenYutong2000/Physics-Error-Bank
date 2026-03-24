@@ -2,6 +2,8 @@ import { readFile, stat } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/api-auth";
+import { isOssConfigured, isOssImageKey } from "@/lib/oss-config";
+import { getOssClient, ossKeyBelongsToUser } from "@/lib/oss-client";
 import { localUploadRoot } from "@/lib/mistake-files";
 
 export const runtime = "nodejs";
@@ -37,6 +39,35 @@ export async function GET(request: Request, context: Ctx) {
 
   if (decoded.some((p) => p.includes("..") || p === "")) {
     return NextResponse.json({ error: "Bad path." }, { status: 400 });
+  }
+
+  const objectKey = decoded.join("/");
+
+  if (isOssImageKey(objectKey)) {
+    if (!isOssConfigured()) {
+      return NextResponse.json(
+        { error: "This image is stored in OSS but OSS is not configured on the server." },
+        { status: 503 },
+      );
+    }
+    if (!ossKeyBelongsToUser(objectKey, user.id)) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+    try {
+      const oss = getOssClient();
+      const result = await oss.get(objectKey);
+      const headers = (result.res as { headers?: Record<string, string> }).headers ?? {};
+      const contentType =
+        headers["content-type"] ?? headers["Content-Type"] ?? "application/octet-stream";
+      return new NextResponse(new Uint8Array(result.content), {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
   }
 
   const [first, ...rest] = decoded;

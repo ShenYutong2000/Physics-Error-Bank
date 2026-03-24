@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/api-auth";
+import { assertOssEnvForUpload, getImageStorageMode } from "@/lib/oss-config";
 import { isDatabaseEnabled } from "@/lib/sync-user-prisma";
 import { deleteMistakeImageFile, saveMistakeImage } from "@/lib/mistake-files";
 import { createMistakeForUser, listMistakesForUser } from "@/lib/mistakes-repo";
@@ -78,6 +79,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid tags JSON." }, { status: 400 });
   }
 
+  if (getImageStorageMode() === "oss") {
+    try {
+      assertOssEnvForUpload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "OSS is not configured.";
+      return NextResponse.json({ error: msg }, { status: 503 });
+    }
+  }
+
   let imageKey: string | null = null;
   try {
     imageKey = await saveMistakeImage(user.id, image);
@@ -94,6 +104,9 @@ export async function POST(request: Request) {
     const msg = e instanceof Error ? e.message : "Failed to save mistake.";
     if (msg.includes("At least one tag")) {
       return NextResponse.json({ error: msg }, { status: 400 });
+    }
+    if (msg.includes("IMAGE_STORAGE=oss") || msg.includes("OSS environment")) {
+      return NextResponse.json({ error: msg }, { status: 503 });
     }
     console.error(e);
     return NextResponse.json({ error: "Failed to save mistake." }, { status: 500 });
