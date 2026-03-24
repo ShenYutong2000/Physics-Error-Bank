@@ -6,9 +6,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
+import { apiFetchJson } from "@/lib/api-client";
 import type { MistakeEntry } from "@/lib/types";
 
 type AddMistakeInput = {
@@ -22,8 +24,8 @@ type MistakesContextValue = {
   addMistake: (input: AddMistakeInput) => Promise<{ ok: boolean; error?: string }>;
   updateMistake: (
     id: string,
-    input: { notes: string; tags: string[] },
-  ) => Promise<{ ok: boolean; error?: string }>;
+    input: { notes: string; tags: string[]; expectedUpdatedAt: string },
+  ) => Promise<{ ok: boolean; error?: string; conflict?: boolean }>;
   removeMistake: (id: string) => Promise<{ ok: boolean; error?: string }>;
   refetchMistakes: () => Promise<void>;
   ready: boolean;
@@ -35,26 +37,25 @@ type MistakesContextValue = {
 const MistakesContext = createContext<MistakesContextValue | null>(null);
 
 async function fetchMistakesList(): Promise<{ ok: true; mistakes: MistakeEntry[] } | { ok: false; error: string }> {
-  const res = await fetch("/api/mistakes", { credentials: "include" });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
+  const result = await apiFetchJson<{ mistakes: MistakeEntry[] }>("/api/mistakes");
+  if (!result.ok) {
     return {
       ok: false,
       error:
-        data.error ??
-        (res.status === 503
+        result.error ??
+        (result.status === 503
           ? "Database is not configured (DATABASE_URL)."
-          : res.status === 401
+          : result.status === 401
             ? "Unauthorized. Try Log out and sign in again (use the same site host, e.g. only localhost or only 127.0.0.1)."
             : "Could not load your library."),
     };
   }
-  const data = (await res.json()) as { mistakes: MistakeEntry[] };
-  return { ok: true, mistakes: Array.isArray(data.mistakes) ? data.mistakes : [] };
+  return { ok: true, mistakes: Array.isArray(result.data.mistakes) ? result.data.mistakes : [] };
 }
 
 export function MistakesProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const hasFetchedRef = useRef(false);
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -85,12 +86,15 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Do not fetch mistakes on auth screen; prevents stale 401 flashing after SPA login redirect.
     if (pathname === "/") {
+      hasFetchedRef.current = false;
       setMistakes([]);
       setLoadError(null);
       setLoading(false);
       setReady(true);
       return;
     }
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     void refetchMistakes();
   }, [pathname, refetchMistakes]);
 
@@ -101,20 +105,15 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       fd.set("image", input.file);
       fd.set("notes", input.notes);
       fd.set("tags", JSON.stringify(input.tags));
-      const res = await fetch("/api/mistakes", {
+      const result = await apiFetchJson<{ mistake?: MistakeEntry }>("/api/mistakes", {
         method: "POST",
         body: fd,
-        credentials: "include",
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        mistake?: MistakeEntry;
-        error?: string;
-      };
-      if (!res.ok) {
-        return { ok: false as const, error: data.error ?? "Could not save mistake." };
+      if (!result.ok) {
+        return { ok: false as const, error: result.error ?? "Could not save mistake." };
       }
-      if (data.mistake) {
-        setMistakes((prev) => [data.mistake!, ...prev]);
+      if (result.data.mistake) {
+        setMistakes((prev) => [result.data.mistake!, ...prev]);
         setLoadError(null);
       }
       return { ok: true as const };
@@ -126,23 +125,29 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateMistake = useCallback(
-    async (id: string, input: { notes: string; tags: string[] }) => {
+    async (id: string, input: { notes: string; tags: string[]; expectedUpdatedAt: string }) => {
       try {
-        const res = await fetch(`/api/mistakes/${encodeURIComponent(id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ notes: input.notes, tags: input.tags }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          mistake?: MistakeEntry;
-          error?: string;
-        };
-        if (!res.ok) {
-          return { ok: false as const, error: data.error ?? "Could not update mistake." };
+        const result = await apiFetchJson<{ mistake?: MistakeEntry }>(
+          `/api/mistakes/${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              notes: input.notes,
+              tags: input.tags,
+              expectedUpdatedAt: input.expectedUpdatedAt,
+            }),
+          },
+        );
+        if (!result.ok) {
+          return {
+            ok: false as const,
+            error: result.error ?? "Could not update mistake.",
+            conflict: result.status === 409,
+          };
         }
-        if (data.mistake) {
-          setMistakes((prev) => prev.map((m) => (m.id === id ? data.mistake! : m)));
+        if (result.data.mistake) {
+          setMistakes((prev) => prev.map((m) => (m.id === id ? result.data.mistake! : m)));
         }
         return { ok: true as const };
       } catch {
@@ -154,18 +159,16 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
 
   const removeMistake = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/mistakes/${encodeURIComponent(id)}`, {
+      const result = await apiFetchJson<{ ok?: boolean }>(`/api/mistakes/${encodeURIComponent(id)}`, {
         method: "DELETE",
-        credentials: "include",
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (res.ok) {
+      if (result.ok) {
         setMistakes((prev) => prev.filter((m) => m.id !== id));
         return { ok: true as const };
       }
       return {
         ok: false as const,
-        error: data.error ?? "Could not delete mistake.",
+        error: result.error ?? "Could not delete mistake.",
       };
     } catch {
       return { ok: false as const, error: "Network error while deleting." };

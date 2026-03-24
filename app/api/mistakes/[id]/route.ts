@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUserFromRequest } from "@/lib/api-auth";
-import { isDatabaseConfigured } from "@/lib/db";
+import { requireDbAndUser } from "@/lib/api-route-guards";
+import { parseTagNamesFromUnknown } from "@/lib/mistake-input";
 import { deleteMistakeImageFile } from "@/lib/mistake-files";
 import { deleteMistakeForUser, updateMistakeForUser } from "@/lib/mistakes-repo";
 
@@ -9,17 +9,9 @@ export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: Ctx) {
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json(
-      { error: "Database is not configured. Set DATABASE_URL in .env." },
-      { status: 503 },
-    );
-  }
-
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard.response;
+  const { user } = guard;
 
   const { id } = await context.params;
   if (!id) {
@@ -35,23 +27,46 @@ export async function PATCH(request: Request, context: Ctx) {
 
   const o = body as { notes?: unknown; tags?: unknown };
   const notes = typeof o.notes === "string" ? o.notes : "";
-  if (!Array.isArray(o.tags) || !o.tags.every((t) => typeof t === "string")) {
+  const expectedUpdatedAt =
+    typeof (body as { expectedUpdatedAt?: unknown }).expectedUpdatedAt === "string"
+      ? (body as { expectedUpdatedAt: string }).expectedUpdatedAt
+      : "";
+  if (!expectedUpdatedAt) {
+    return NextResponse.json(
+      { error: "Body must include expectedUpdatedAt for optimistic locking." },
+      { status: 400 },
+    );
+  }
+  let tagNames: string[];
+  try {
+    tagNames = parseTagNamesFromUnknown(o.tags);
+  } catch {
     return NextResponse.json(
       { error: "Body must include tags: string[] and optional notes: string." },
       { status: 400 },
     );
   }
-  const tagNames = o.tags as string[];
 
   try {
     const mistake = await updateMistakeForUser(user.id, id, {
       notes: notes.trim(),
       tagNames,
+      expectedUpdatedAt,
     });
-    if (!mistake) {
+    if (mistake.kind === "not_found") {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
-    return NextResponse.json({ mistake });
+    if (mistake.kind === "conflict") {
+      return NextResponse.json(
+        {
+          error:
+            "This mistake was updated elsewhere. Please refresh and try again.",
+          code: "CONFLICT",
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ mistake: mistake.mistake });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Update failed.";
     if (msg.includes("At least one tag")) {
@@ -63,17 +78,9 @@ export async function PATCH(request: Request, context: Ctx) {
 }
 
 export async function DELETE(request: Request, context: Ctx) {
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json(
-      { error: "Database is not configured. Set DATABASE_URL in .env." },
-      { status: 503 },
-    );
-  }
-
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard.response;
+  const { user } = guard;
 
   const { id } = await context.params;
   if (!id) {

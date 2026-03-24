@@ -55,16 +55,11 @@ export async function GET(request: Request, context: Ctx) {
     }
     try {
       const oss = getOssClient();
-      const result = await oss.get(objectKey);
-      const headers = (result.res as { headers?: Record<string, string> }).headers ?? {};
-      const contentType =
-        headers["content-type"] ?? headers["Content-Type"] ?? "application/octet-stream";
-      return new NextResponse(new Uint8Array(result.content), {
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "private, max-age=3600",
-        },
+      const signedUrl = oss.signatureUrl(objectKey, {
+        method: "GET",
+        expires: 60,
       });
+      return NextResponse.redirect(signedUrl, 302);
     } catch {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }

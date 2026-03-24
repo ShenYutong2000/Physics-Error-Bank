@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
+import { NoticeBanner } from "@/components/notice-banner";
+import { RetryableImage } from "@/components/retryable-image";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { PRESET_TAGS } from "@/lib/types";
+import { useLibraryNotices } from "./use-library-notices";
 
 export default function LibraryPage() {
   const {
@@ -25,6 +28,15 @@ export default function LibraryPage() {
   const [editCustomTag, setEditCustomTag] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const {
+    conflictNotice,
+    actionNotice,
+    clearConflictNotice,
+    clearActionNotice,
+    clearAllNotices,
+    showConflictNotice,
+    showActionNotice,
+  } = useLibraryNotices();
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -69,25 +81,15 @@ export default function LibraryPage() {
 
   const detail = detailId ? mistakes.find((m) => m.id === detailId) : null;
 
-  useEffect(() => {
-    setEditError(null);
+  function openDetail(m: (typeof mistakes)[number]) {
+    setDetailId(m.id);
     setEditing(false);
-    if (!detailId) return;
-    const m = mistakes.find((x) => x.id === detailId);
-    if (m) {
-      setEditNotes(m.notes);
-      setEditTags([...m.tags]);
-      setEditCustomTag("");
-    }
-  }, [detailId]);
-
-  useEffect(() => {
-    if (!detailId || editing) return;
-    const m = mistakes.find((x) => x.id === detailId);
-    if (!m) return;
+    setEditError(null);
+    clearAllNotices();
+    setEditCustomTag("");
     setEditNotes(m.notes);
     setEditTags([...m.tags]);
-  }, [mistakes, detailId, editing]);
+  }
 
   function openEdit() {
     if (!detail) return;
@@ -95,6 +97,7 @@ export default function LibraryPage() {
     setEditTags([...detail.tags]);
     setEditCustomTag("");
     setEditError(null);
+    clearConflictNotice();
     setEditing(true);
   }
 
@@ -108,20 +111,33 @@ export default function LibraryPage() {
   }
 
   async function saveEdit() {
-    if (!detailId) return;
+    if (!detailId || !detail) return;
     if (editTags.length === 0) {
       setEditError("Pick at least one tag.");
       return;
     }
     setEditError(null);
     setEditSaving(true);
-    const result = await updateMistake(detailId, { notes: editNotes.trim(), tags: editTags });
+    const result = await updateMistake(detailId, {
+      notes: editNotes.trim(),
+      tags: editTags,
+      expectedUpdatedAt: detail.updatedAt,
+    });
     setEditSaving(false);
     if (!result.ok) {
+      if (result.conflict) {
+        await refetchMistakes();
+        setEditing(false);
+        showConflictNotice(
+          "This mistake was updated elsewhere. Latest content has been reloaded. Please review and edit again.",
+        );
+        return;
+      }
       setEditError(result.error ?? "Save failed.");
       return;
     }
     setEditing(false);
+    clearConflictNotice();
   }
 
   function toggleEditPreset(t: string) {
@@ -141,6 +157,7 @@ export default function LibraryPage() {
     setDetailId(null);
     setEditing(false);
     setEditError(null);
+    clearAllNotices();
   }
 
   if (!ready) {
@@ -154,17 +171,18 @@ export default function LibraryPage() {
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
       {loadError && (
-        <div className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-3 text-sm font-bold text-[#a60]">
-          <p>{loadError}</p>
-          <button
-            type="button"
-            className="mt-2 rounded-lg border-2 border-[#a60] bg-white px-3 py-1.5 text-xs font-extrabold text-[#a60] hover:bg-[#fff8f0]"
-            onClick={() => void refetchMistakes()}
-            disabled={loading}
-          >
-            {loading ? "Retrying…" : "Retry"}
-          </button>
-        </div>
+        <NoticeBanner
+          tone="warning"
+          message={loadError}
+          className="mb-4"
+          actions={[
+            {
+              label: loading ? "Retrying…" : "Retry",
+              onClick: () => void refetchMistakes(),
+              disabled: loading,
+            },
+          ]}
+        />
       )}
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">
@@ -176,6 +194,14 @@ export default function LibraryPage() {
           details.
         </p>
       </header>
+      {actionNotice && (
+        <NoticeBanner
+          tone="error"
+          message={actionNotice}
+          className="mb-4"
+          actions={[{ label: "Dismiss", onClick: clearActionNotice }]}
+        />
+      )}
 
       <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--duo-text)]">
@@ -267,11 +293,10 @@ export default function LibraryPage() {
             <button
               type="button"
               className="block w-full text-left"
-              onClick={() => setDetailId(m.id)}
+              onClick={() => openDetail(m)}
             >
               <div className="relative aspect-[4/3] w-full bg-[var(--duo-surface)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <RetryableImage
                   src={m.imageUrl}
                   alt=""
                   className="h-full w-full object-contain"
@@ -304,7 +329,9 @@ export default function LibraryPage() {
                   if (!confirm("Delete this mistake?")) return;
                   void (async () => {
                     const r = await removeMistake(m.id);
-                    if (!r.ok) alert(r.error ?? "Delete failed.");
+                    if (!r.ok) {
+                      showActionNotice(r.error ?? "Delete failed.");
+                    }
                   })();
                 }}
               >
@@ -313,7 +340,7 @@ export default function LibraryPage() {
               <button
                 type="button"
                 className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2 text-sm font-bold text-[var(--duo-text)]"
-                onClick={() => setDetailId(m.id)}
+                onClick={() => openDetail(m)}
               >
                 Details
               </button>
@@ -365,8 +392,7 @@ export default function LibraryPage() {
             </div>
             <div className="p-4">
               <div className="overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <RetryableImage
                   src={detail.imageUrl}
                   alt="Problem"
                   className="max-h-[50vh] w-full object-contain"
@@ -375,6 +401,17 @@ export default function LibraryPage() {
 
               {!editing ? (
                 <>
+                  {conflictNotice && (
+                    <NoticeBanner
+                      tone="warning"
+                      message={conflictNotice}
+                      className="mt-4"
+                      actions={[
+                        { label: "Edit latest version", onClick: openEdit },
+                        { label: "Dismiss", onClick: clearConflictNotice },
+                      ]}
+                    />
+                  )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {detail.tags.map((t) => (
                       <span

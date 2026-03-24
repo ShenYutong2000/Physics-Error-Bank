@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
+import { compressImageForUpload } from "@/lib/image-compress";
 import { PRESET_TAGS } from "@/lib/types";
 
 export default function AddMistakePage() {
@@ -16,6 +17,7 @@ export default function AddMistakePage() {
   const [customTag, setCustomTag] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
 
   const clearPreview = useCallback(() => {
     if (previewUrl?.startsWith("blob:")) {
@@ -54,8 +56,8 @@ export default function AddMistakePage() {
 
   const submit = async () => {
     setError(null);
-    const file = selectedFileRef.current;
-    if (!file) {
+    const rawFile = selectedFileRef.current;
+    if (!rawFile) {
       setError("Take a photo or upload an image of the problem first.");
       return;
     }
@@ -63,6 +65,21 @@ export default function AddMistakePage() {
       setError("Pick at least one tag.");
       return;
     }
+    setCompressing(true);
+    let file: File = rawFile;
+    try {
+      file = await compressImageForUpload(rawFile, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.82,
+      });
+    } catch {
+      // Compression failure should not block upload.
+      file = rawFile;
+    } finally {
+      setCompressing(false);
+    }
+
     const result = await addMistake({ file, tags, notes: notes.trim() });
     if (!result.ok) {
       setError(result.error ?? "Could not save.");
@@ -212,10 +229,10 @@ export default function AddMistakePage() {
       <button
         type="button"
         onClick={() => void submit()}
-        disabled={saving}
+        disabled={saving || compressing}
         className="duo-btn-primary w-full py-4 text-lg disabled:opacity-60"
       >
-        {saving ? "Saving…" : "Save to library"}
+        {compressing ? "Optimizing image…" : saving ? "Saving…" : "Save to library"}
       </button>
     </div>
   );
