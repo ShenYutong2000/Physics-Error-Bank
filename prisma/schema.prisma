@@ -1,0 +1,62 @@
+// Physics Error Bank — PostgreSQL (Prisma 6)
+// Apply schema: npm run db:migrate   (needs DATABASE_URL in .env)
+// Client:       npm run db:generate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Registered student accounts (replaces or complements data/users.json when wired up).
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  mistakes     Mistake[]
+  tags         Tag[]
+
+  @@map("users")
+}
+
+/// One saved mistake per user. Store the image in object storage; `imageKey` is the bucket key (or public URL path).
+model Mistake {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes       String       @default("")
+  imageKey    String       @map("image_key") @db.VarChar(1024)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  mistakeTags MistakeTag[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("mistakes")
+}
+
+/// Tags are scoped per user (same label can exist for different users).
+model Tag {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String       @db.VarChar(128)
+  mistakeTags MistakeTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+model MistakeTag {
+  mistakeId String  @map("mistake_id") @db.Uuid
+  tagId     String  @map("tag_id") @db.Uuid
+  mistake   Mistake @relation(fields: [mistakeId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mistakeId, tagId])
+  @@index([tagId])
+  @@map("mistake_tags")
+}

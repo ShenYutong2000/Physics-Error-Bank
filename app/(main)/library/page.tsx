@@ -6,7 +6,7 @@ import { TagStatsChart } from "@/components/tag-stats-chart";
 import { PRESET_TAGS } from "@/lib/types";
 
 export default function LibraryPage() {
-  const { mistakes, removeMistake, ready } = useMistakes();
+  const { mistakes, removeMistake, ready, loadError } = useMistakes();
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<"all" | "any">("any");
   const [search, setSearch] = useState("");
@@ -65,6 +65,11 @@ export default function LibraryPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+      {loadError && (
+        <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60]">
+          {loadError}
+        </p>
+      )}
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">
           Your progress
@@ -170,7 +175,7 @@ export default function LibraryPage() {
               <div className="relative aspect-[4/3] w-full bg-[var(--duo-surface)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={m.imageDataUrl}
+                  src={m.imageUrl}
                   alt=""
                   className="h-full w-full object-contain"
                 />
@@ -199,7 +204,7 @@ export default function LibraryPage() {
                 type="button"
                 className="flex-1 rounded-xl border-b-4 border-[#d94848] bg-[#ff4b4b] py-2 text-sm font-bold text-white active:translate-y-0.5 active:border-b-2"
                 onClick={() => {
-                  if (confirm("Delete this mistake?")) removeMistake(m.id);
+                  if (confirm("Delete this mistake?")) void removeMistake(m.id);
                 }}
               >
                 Delete
@@ -250,7 +255,7 @@ export default function LibraryPage() {
               <div className="overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={detail.imageDataUrl}
+                  src={detail.imageUrl}
                   alt="Problem"
                   className="max-h-[50vh] w-full object-contain"
                 />

@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
 import { getAuthSecret, getExpectedCredentials } from "@/lib/auth-config";
 import { normalizeEmail } from "@/lib/auth-validation";
-import { verifyRegisteredUser } from "@/lib/user-store";
+import {
+  ensureBootstrapUserInPrisma,
+  upsertRegisteredUserInPrisma,
+} from "@/lib/sync-user-prisma";
+import { findUserByEmail, verifyRegisteredUser } from "@/lib/user-store";
 
 export const runtime = "nodejs";
 
@@ -31,11 +35,16 @@ export async function POST(request: Request) {
 
   const registeredOk = await verifyRegisteredUser(email, password);
   if (registeredOk) {
+    const record = await findUserByEmail(email);
+    if (record) {
+      await upsertRegisteredUserInPrisma(record.email, record.passwordHash);
+    }
     return jsonResponseWithSession(email, secret);
   }
 
   const creds = getExpectedCredentials();
   if (creds && email === creds.email.toLowerCase() && password === creds.password) {
+    await ensureBootstrapUserInPrisma(email, password);
     return jsonResponseWithSession(email, secret);
   }
 
