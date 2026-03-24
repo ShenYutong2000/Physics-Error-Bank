@@ -3,23 +3,40 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type Mode = "login" | "register";
+
 type Props = {
   showDevHint?: boolean;
 };
 
 export function LoginScreen({ showDevHint }: Props) {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    setConfirmPassword("");
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === "register" && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setPending(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const url = mode === "login" ? "/api/auth/login" : "/api/auth/register";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -46,24 +63,59 @@ export function LoginScreen({ showDevHint }: Props) {
         <div className="mb-6 flex flex-col items-center">
           <LoginMascot className="h-36 w-36 drop-shadow-lg sm:h-44 sm:w-44" />
           <h1 className="mt-4 text-center text-3xl font-black tracking-tight text-[var(--duo-text)] sm:text-4xl">
-            Hi there!
+            {mode === "login" ? "Hi there!" : "Join the nest!"}
           </h1>
           <p className="mt-2 max-w-sm text-center text-base font-bold text-[var(--duo-text-muted)]">
-            Log in to save mistakes, tag them, and crush your physics goals.
+            {mode === "login"
+              ? "Log in to save mistakes, tag them, and crush your physics goals."
+              : "Create an account with your email—then start building your error bank."}
           </p>
         </div>
 
         <div className="w-full rounded-[1.75rem] border-4 border-white bg-white/95 p-6 shadow-[0_8px_0_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-8">
+          <div
+            className="mb-6 flex rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] p-1"
+            role="tablist"
+            aria-label="Log in or sign up"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "login"}
+              onClick={() => switchMode("login")}
+              className={`flex-1 rounded-xl py-3 text-sm font-extrabold transition-colors ${
+                mode === "login"
+                  ? "border-b-4 border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                  : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
+              }`}
+            >
+              Log in
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "register"}
+              onClick={() => switchMode("register")}
+              className={`flex-1 rounded-xl py-3 text-sm font-extrabold transition-colors ${
+                mode === "register"
+                  ? "border-b-4 border-[var(--duo-blue-shadow)] bg-[var(--duo-blue)] text-white"
+                  : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
+              }`}
+            >
+              Sign up
+            </button>
+          </div>
+
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
               <label
-                htmlFor="login-email"
+                htmlFor="auth-email"
                 className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
               >
                 Email
               </label>
               <input
-                id="login-email"
+                id="auth-email"
                 type="email"
                 autoComplete="email"
                 value={email}
@@ -75,22 +127,50 @@ export function LoginScreen({ showDevHint }: Props) {
             </div>
             <div>
               <label
-                htmlFor="login-password"
+                htmlFor="auth-password"
                 className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
               >
                 Password
               </label>
               <input
-                id="login-password"
+                id="auth-password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={mode === "register" ? 8 : undefined}
                 className="w-full rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] px-4 py-3.5 text-base font-bold text-[var(--duo-text)] outline-none ring-[var(--duo-blue)] focus:border-[var(--duo-blue)] focus:ring-2"
                 placeholder="••••••••"
               />
+              {mode === "register" && (
+                <p className="mt-1.5 text-xs font-bold text-[var(--duo-text-muted)]">
+                  At least 8 characters.
+                </p>
+              )}
             </div>
+
+            {mode === "register" && (
+              <div>
+                <label
+                  htmlFor="auth-confirm"
+                  className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                >
+                  Confirm password
+                </label>
+                <input
+                  id="auth-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] px-4 py-3.5 text-base font-bold text-[var(--duo-text)] outline-none ring-[var(--duo-blue)] focus:border-[var(--duo-blue)] focus:ring-2"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
 
             {error && (
               <p className="rounded-2xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-center text-sm font-extrabold text-[#b00020]">
@@ -103,15 +183,23 @@ export function LoginScreen({ showDevHint }: Props) {
               disabled={pending}
               className="duo-btn-primary mt-2 w-full py-4 text-lg disabled:opacity-60"
             >
-              {pending ? "Signing in…" : "Continue"}
+              {pending
+                ? mode === "login"
+                  ? "Signing in…"
+                  : "Creating account…"
+                : mode === "login"
+                  ? "Continue"
+                  : "Create account"}
             </button>
           </form>
 
           {showDevHint && (
             <p className="mt-4 text-center text-xs font-bold text-[var(--duo-text-muted)]">
-              Dev demo:{" "}
+              Dev demo login:{" "}
               <span className="text-[var(--duo-green-dark)]">student@example.com</span> /{" "}
               <span className="text-[var(--duo-green-dark)]">physics123</span>
+              <br />
+              <span className="mt-1 inline-block">Or sign up with any new email (stored in /data/users.json).</span>
             </p>
           )}
         </div>
