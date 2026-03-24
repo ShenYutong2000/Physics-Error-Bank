@@ -5,6 +5,7 @@ export type MistakeEntry = {
   tags: string[];
   notes: string;
   createdAt: string;
+  updatedAt: string;
 };
 
 export const PRESET_TAGS = [

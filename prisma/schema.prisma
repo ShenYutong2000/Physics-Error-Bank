@@ -31,6 +31,7 @@ model Mistake {
   notes       String       @default("")
   imageKey    String       @map("image_key") @db.VarChar(1024)
   createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
   mistakeTags MistakeTag[]
 
   @@index([userId, createdAt(sort: Desc)])

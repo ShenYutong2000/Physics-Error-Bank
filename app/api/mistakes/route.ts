@@ -1,26 +1,16 @@
 import { NextResponse } from "next/server";
-import { getSessionUserFromRequest } from "@/lib/api-auth";
+import { requireDbAndUser } from "@/lib/api-route-guards";
 import { assertOssEnvForUpload, getImageStorageMode } from "@/lib/oss-config";
-import { isDatabaseConfigured } from "@/lib/db";
 import { deleteMistakeImageFile, saveMistakeImage } from "@/lib/mistake-files";
+import { MAX_IMAGE_BYTES, parseTagNamesFromJsonString } from "@/lib/mistake-input";
 import { createMistakeForUser, listMistakesForUser } from "@/lib/mistakes-repo";
 
 export const runtime = "nodejs";
 
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-
 export async function GET(request: Request) {
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json(
-      { error: "Database is not configured. Set DATABASE_URL in .env." },
-      { status: 503 },
-    );
-  }
-
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard.response;
+  const { user } = guard;
 
   try {
     const mistakes = await listMistakesForUser(user.id);
@@ -32,17 +22,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json(
-      { error: "Database is not configured. Set DATABASE_URL in .env." },
-      { status: 503 },
-    );
-  }
-
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard.response;
+  const { user } = guard;
 
   let form: FormData;
   try {
@@ -70,13 +52,9 @@ export async function POST(request: Request) {
 
   let tagNames: string[];
   try {
-    const parsed = JSON.parse(tagsRaw) as unknown;
-    if (!Array.isArray(parsed) || !parsed.every((t) => typeof t === "string")) {
-      return NextResponse.json({ error: "Tags must be a JSON string array." }, { status: 400 });
-    }
-    tagNames = parsed;
+    tagNames = parseTagNamesFromJsonString(tagsRaw);
   } catch {
-    return NextResponse.json({ error: "Invalid tags JSON." }, { status: 400 });
+    return NextResponse.json({ error: "Tags must be a JSON string array." }, { status: 400 });
   }
 
   if (getImageStorageMode() === "oss") {
