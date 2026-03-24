@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/api-auth";
 import { assertOssEnvForUpload, getImageStorageMode } from "@/lib/oss-config";
-import { isDatabaseEnabled } from "@/lib/sync-user-prisma";
+import { isDatabaseConfigured } from "@/lib/db";
 import { deleteMistakeImageFile, saveMistakeImage } from "@/lib/mistake-files";
 import { createMistakeForUser, listMistakesForUser } from "@/lib/mistakes-repo";
 
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export async function GET(request: Request) {
-  if (!isDatabaseEnabled()) {
+  if (!isDatabaseConfigured()) {
     return NextResponse.json(
       { error: "Database is not configured. Set DATABASE_URL in .env." },
       { status: 503 },
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isDatabaseEnabled()) {
+  if (!isDatabaseConfigured()) {
     return NextResponse.json(
       { error: "Database is not configured. Set DATABASE_URL in .env." },
       { status: 503 },

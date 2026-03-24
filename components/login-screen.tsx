@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  isStudentSchoolEmail,
+  STUDENT_EMAIL_DOMAIN,
+  STUDENT_EMAIL_REQUIRED_MESSAGE,
+} from "@/lib/auth-validation";
 
 type Mode = "login" | "register";
 
@@ -30,6 +35,11 @@ export function LoginScreen({ showDevHint }: Props) {
 
     if (mode === "register" && password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+
+    if (mode === "register" && !isStudentSchoolEmail(email)) {
+      setError(STUDENT_EMAIL_REQUIRED_MESSAGE);
       return;
     }
 
@@ -67,8 +77,8 @@ export function LoginScreen({ showDevHint }: Props) {
           </h1>
           <p className="mt-2 max-w-sm text-center text-base font-bold text-[var(--duo-text-muted)]">
             {mode === "login"
-              ? "Log in to save mistakes, tag them, and crush your physics goals."
-              : "Create an account with your email—then start building your error bank."}
+              ? "Log in with your UWC China school email to save mistakes and review your library."
+              : `Sign up with your school email (${STUDENT_EMAIL_DOMAIN}) to create your error bank.`}
           </p>
         </div>
 
@@ -112,7 +122,7 @@ export function LoginScreen({ showDevHint }: Props) {
                 htmlFor="auth-email"
                 className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
               >
-                Email
+                School email
               </label>
               <input
                 id="auth-email"
@@ -122,8 +132,12 @@ export function LoginScreen({ showDevHint }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] px-4 py-3.5 text-base font-bold text-[var(--duo-text)] outline-none ring-[var(--duo-blue)] focus:border-[var(--duo-blue)] focus:ring-2"
-                placeholder="you@school.edu"
+                placeholder={`name${STUDENT_EMAIL_DOMAIN}`}
               />
+              <p className="mt-1.5 text-xs font-bold text-[var(--duo-text-muted)]">
+                Must end with {STUDENT_EMAIL_DOMAIN}
+                {showDevHint ? " (dev bootstrap login may use a different demo address)." : ""}
+              </p>
             </div>
             <div>
               <label
@@ -195,11 +209,14 @@ export function LoginScreen({ showDevHint }: Props) {
 
           {showDevHint && (
             <p className="mt-4 text-center text-xs font-bold text-[var(--duo-text-muted)]">
-              Dev demo login:{" "}
+              Dev-only bootstrap login:{" "}
               <span className="text-[var(--duo-green-dark)]">student@example.com</span> /{" "}
               <span className="text-[var(--duo-green-dark)]">physics123</span>
               <br />
-              <span className="mt-1 inline-block">Or sign up with any new email (stored in /data/users.json).</span>
+              <span className="mt-1 inline-block">
+                Sign up always requires {STUDENT_EMAIL_DOMAIN}. Set AUTH_EMAIL in .env to use another
+                bootstrap account in development.
+              </span>
             </p>
           )}
         </div>

@@ -68,6 +68,48 @@ export async function createMistakeForUser(
   return rowToEntry(mistake);
 }
 
+export async function updateMistakeForUser(
+  userId: string,
+  mistakeId: string,
+  input: { notes: string; tagNames: string[] },
+): Promise<MistakeEntry | null> {
+  const names = [...new Set(input.tagNames.map((t) => t.trim()).filter(Boolean))];
+  if (names.length === 0) {
+    throw new Error("At least one tag is required.");
+  }
+
+  const full = await prisma.$transaction(async (tx) => {
+    const existing = await tx.mistake.findFirst({
+      where: { id: mistakeId, userId },
+      select: { id: true },
+    });
+    if (!existing) return null;
+
+    await tx.mistakeTag.deleteMany({ where: { mistakeId } });
+    await tx.mistake.update({
+      where: { id: mistakeId },
+      data: { notes: input.notes },
+    });
+    for (const name of names) {
+      const tag = await tx.tag.upsert({
+        where: { userId_name: { userId, name } },
+        create: { userId, name },
+        update: {},
+      });
+      await tx.mistakeTag.create({
+        data: { mistakeId, tagId: tag.id },
+      });
+    }
+    return tx.mistake.findUniqueOrThrow({
+      where: { id: mistakeId },
+      include: { mistakeTags: { include: { tag: true } } },
+    });
+  });
+
+  if (!full) return null;
+  return rowToEntry(full);
+}
+
 export async function deleteMistakeForUser(
   userId: string,
   mistakeId: string,
