@@ -1,16 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { PRESET_TAGS } from "@/lib/types";
 
 export default function LibraryPage() {
-  const { mistakes, removeMistake, ready, loadError } = useMistakes();
+  const {
+    mistakes,
+    removeMistake,
+    updateMistake,
+    refetchMistakes,
+    ready,
+    loading,
+    loadError,
+  } = useMistakes();
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<"all" | "any">("any");
   const [search, setSearch] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editCustomTag, setEditCustomTag] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -55,6 +69,80 @@ export default function LibraryPage() {
 
   const detail = detailId ? mistakes.find((m) => m.id === detailId) : null;
 
+  useEffect(() => {
+    setEditError(null);
+    setEditing(false);
+    if (!detailId) return;
+    const m = mistakes.find((x) => x.id === detailId);
+    if (m) {
+      setEditNotes(m.notes);
+      setEditTags([...m.tags]);
+      setEditCustomTag("");
+    }
+  }, [detailId]);
+
+  useEffect(() => {
+    if (!detailId || editing) return;
+    const m = mistakes.find((x) => x.id === detailId);
+    if (!m) return;
+    setEditNotes(m.notes);
+    setEditTags([...m.tags]);
+  }, [mistakes, detailId, editing]);
+
+  function openEdit() {
+    if (!detail) return;
+    setEditNotes(detail.notes);
+    setEditTags([...detail.tags]);
+    setEditCustomTag("");
+    setEditError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    if (detail) {
+      setEditNotes(detail.notes);
+      setEditTags([...detail.tags]);
+    }
+    setEditing(false);
+    setEditError(null);
+  }
+
+  async function saveEdit() {
+    if (!detailId) return;
+    if (editTags.length === 0) {
+      setEditError("Pick at least one tag.");
+      return;
+    }
+    setEditError(null);
+    setEditSaving(true);
+    const result = await updateMistake(detailId, { notes: editNotes.trim(), tags: editTags });
+    setEditSaving(false);
+    if (!result.ok) {
+      setEditError(result.error ?? "Save failed.");
+      return;
+    }
+    setEditing(false);
+  }
+
+  function toggleEditPreset(t: string) {
+    setEditTags((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    );
+  }
+
+  function addEditCustomTag() {
+    const t = editCustomTag.trim();
+    if (!t) return;
+    if (!editTags.includes(t)) setEditTags((prev) => [...prev, t]);
+    setEditCustomTag("");
+  }
+
+  function closeDetail() {
+    setDetailId(null);
+    setEditing(false);
+    setEditError(null);
+  }
+
   if (!ready) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-[var(--duo-text-muted)]">
@@ -66,9 +154,17 @@ export default function LibraryPage() {
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
       {loadError && (
-        <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60]">
-          {loadError}
-        </p>
+        <div className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-3 text-sm font-bold text-[#a60]">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            className="mt-2 rounded-lg border-2 border-[#a60] bg-white px-3 py-1.5 text-xs font-extrabold text-[#a60] hover:bg-[#fff8f0]"
+            onClick={() => void refetchMistakes()}
+            disabled={loading}
+          >
+            {loading ? "Retrying…" : "Retry"}
+          </button>
+        </div>
       )}
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">
@@ -76,7 +172,8 @@ export default function LibraryPage() {
         </p>
         <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Library</h1>
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
-          Browse and filter by tags—see which categories show up most often.
+          Browse and filter by tags—see which categories show up most often. Edit notes and tags in
+          details.
         </p>
       </header>
 
@@ -204,7 +301,11 @@ export default function LibraryPage() {
                 type="button"
                 className="flex-1 rounded-xl border-b-4 border-[#d94848] bg-[#ff4b4b] py-2 text-sm font-bold text-white active:translate-y-0.5 active:border-b-2"
                 onClick={() => {
-                  if (confirm("Delete this mistake?")) void removeMistake(m.id);
+                  if (!confirm("Delete this mistake?")) return;
+                  void (async () => {
+                    const r = await removeMistake(m.id);
+                    if (!r.ok) alert(r.error ?? "Delete failed.");
+                  })();
                 }}
               >
                 Delete
@@ -221,7 +322,7 @@ export default function LibraryPage() {
         ))}
       </ul>
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !loadError && (
         <div className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-12 text-center">
           <p className="text-lg font-extrabold text-[var(--duo-text)]">Nothing here yet</p>
           <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
@@ -236,20 +337,31 @@ export default function LibraryPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="detail-title"
-          onClick={(e) => e.target === e.currentTarget && setDetailId(null)}
+          onClick={(e) => e.target === e.currentTarget && closeDetail()}
         >
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b-2 border-[var(--duo-border)] bg-white px-4 py-3">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b-2 border-[var(--duo-border)] bg-white px-4 py-3">
               <h2 id="detail-title" className="text-lg font-extrabold text-[var(--duo-text)]">
                 Mistake details
               </h2>
-              <button
-                type="button"
-                className="rounded-xl bg-[var(--duo-surface)] px-3 py-1 text-sm font-bold"
-                onClick={() => setDetailId(null)}
-              >
-                Close
-              </button>
+              <div className="flex gap-2">
+                {!editing ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border-2 border-[var(--duo-green-shadow)] bg-[var(--duo-green)] px-3 py-1 text-sm font-bold text-white"
+                    onClick={openEdit}
+                  >
+                    Edit
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded-xl bg-[var(--duo-surface)] px-3 py-1 text-sm font-bold"
+                  onClick={closeDetail}
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div className="p-4">
               <div className="overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
@@ -260,20 +372,101 @@ export default function LibraryPage() {
                   className="max-h-[50vh] w-full object-contain"
                 />
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {detail.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-lg bg-[#eef7e8] px-2 py-1 text-sm font-bold text-[var(--duo-green-dark)]"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <h3 className="mt-4 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>
-              <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-[var(--duo-text-muted)]">
-                {detail.notes || "(None)"}
-              </p>
+
+              {!editing ? (
+                <>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {detail.tags.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-lg bg-[#eef7e8] px-2 py-1 text-sm font-bold text-[var(--duo-green-dark)]"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <h3 className="mt-4 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-[var(--duo-text-muted)]">
+                    {detail.notes || "(None)"}
+                  </p>
+                </>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <h3 className="mb-2 text-sm font-bold text-[var(--duo-text)]">Tags</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {PRESET_TAGS.map((t) => {
+                        const on = editTags.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => toggleEditPreset(t)}
+                            className={`rounded-xl border-2 px-3 py-2 text-sm font-bold ${
+                              on
+                                ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                                : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)]"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={editCustomTag}
+                        onChange={(e) => setEditCustomTag(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && (e.preventDefault(), addEditCustomTag())
+                        }
+                        placeholder="Custom tag"
+                        className="min-w-0 flex-1 rounded-xl border-2 border-[var(--duo-border)] px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-green)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={addEditCustomTag}
+                        className="shrink-0 rounded-xl border-b-4 border-[#1d9cdb] bg-[var(--duo-blue)] px-3 py-2 text-sm font-bold text-white active:translate-y-0.5 active:border-b-2"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="mb-2 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      rows={5}
+                      className="w-full resize-y rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] p-3 text-sm font-medium outline-none focus:border-[var(--duo-green)]"
+                    />
+                  </div>
+                  {editError && (
+                    <p className="rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
+                      {editError}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={editSaving}
+                      className="duo-btn-primary flex-1 py-3 text-sm disabled:opacity-60"
+                      onClick={() => void saveEdit()}
+                    >
+                      {editSaving ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={editSaving}
+                      className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-3 text-sm font-bold text-[var(--duo-text)]"
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

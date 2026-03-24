@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
 import { getAuthSecret } from "@/lib/auth-config";
-import { isValidEmail, MIN_PASSWORD_LENGTH, normalizeEmail } from "@/lib/auth-validation";
-import { createRegisteredUser } from "@/lib/user-store";
+import {
+  isStudentSchoolEmail,
+  isValidEmail,
+  MIN_PASSWORD_LENGTH,
+  normalizeEmail,
+  STUDENT_EMAIL_REQUIRED_MESSAGE,
+} from "@/lib/auth-validation";
+import { isDatabaseConfigured } from "@/lib/db";
+import { createRegisteredUser } from "@/lib/users-repo";
 
 export const runtime = "nodejs";
 
@@ -25,6 +32,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
 
+  if (!isStudentSchoolEmail(email)) {
+    return NextResponse.json({ error: STUDENT_EMAIL_REQUIRED_MESSAGE }, { status: 400 });
+  }
+
   if (password.length < MIN_PASSWORD_LENGTH) {
     return NextResponse.json(
       { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
@@ -36,6 +47,13 @@ export async function POST(request: Request) {
   if (!secret) {
     return NextResponse.json(
       { error: "Server is not configured. Set AUTH_SECRET." },
+      { status: 503 },
+    );
+  }
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      { error: "Database is not configured. Set DATABASE_URL." },
       { status: 503 },
     );
   }

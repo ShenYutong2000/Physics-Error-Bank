@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
 import { getAuthSecret, getExpectedCredentials } from "@/lib/auth-config";
-import { normalizeEmail } from "@/lib/auth-validation";
 import {
-  ensureBootstrapUserInPrisma,
-  upsertRegisteredUserInPrisma,
-} from "@/lib/sync-user-prisma";
-import { findUserByEmail, verifyRegisteredUser } from "@/lib/user-store";
+  isStudentSchoolEmail,
+  normalizeEmail,
+  STUDENT_EMAIL_REQUIRED_MESSAGE,
+} from "@/lib/auth-validation";
+import { isDatabaseConfigured } from "@/lib/db";
+import { ensureBootstrapUserInPrisma, verifyRegisteredUser } from "@/lib/users-repo";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
 
+  const creds = getExpectedCredentials();
+  const emailAllowed =
+    isStudentSchoolEmail(email) ||
+    (creds !== null && normalizeEmail(email) === normalizeEmail(creds.email));
+
+  if (!emailAllowed) {
+    return NextResponse.json({ error: STUDENT_EMAIL_REQUIRED_MESSAGE }, { status: 400 });
+  }
+
   const secret = getAuthSecret();
   if (!secret) {
     return NextResponse.json(
@@ -33,17 +43,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      { error: "Database is not configured. Set DATABASE_URL." },
+      { status: 503 },
+    );
+  }
+
   const registeredOk = await verifyRegisteredUser(email, password);
   if (registeredOk) {
-    const record = await findUserByEmail(email);
-    if (record) {
-      await upsertRegisteredUserInPrisma(record.email, record.passwordHash);
-    }
     return jsonResponseWithSession(email, secret);
   }
 
-  const creds = getExpectedCredentials();
-  if (creds && email === creds.email.toLowerCase() && password === creds.password) {
+  if (creds && normalizeEmail(email) === normalizeEmail(creds.email) && password === creds.password) {
     await ensureBootstrapUserInPrisma(email, password);
     return jsonResponseWithSession(email, secret);
   }
