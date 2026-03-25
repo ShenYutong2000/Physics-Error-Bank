@@ -15,6 +15,7 @@ CREATE TABLE "mistakes" (
     "notes" TEXT NOT NULL DEFAULT '',
     "image_key" VARCHAR(1024) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "mistakes_pkey" PRIMARY KEY ("id")
 );
