@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { apiFetchJson } from "@/lib/api-client";
-import { PRESET_TAGS, TAG_GROUPS, type MistakeEntry } from "@/lib/types";
+import { PRESET_TAG_SET, PRESET_TAGS, TAG_GROUPS, type MistakeEntry } from "@/lib/types";
 import { useLibraryNotices } from "./use-library-notices";
 
 export default function LibraryPage() {
@@ -29,6 +29,10 @@ export default function LibraryPage() {
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<"all" | "any">("any");
   const [search, setSearch] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [hasNotes, setHasNotes] = useState<"any" | "yes" | "no">("any");
+  const [presetTagFilter, setPresetTagFilter] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -58,6 +62,10 @@ export default function LibraryPage() {
     params.set("pageSize", String(pageSize));
     params.set("sort", sortBy);
     if (search.trim()) params.set("search", search.trim());
+    if (createdFrom) params.set("createdFrom", createdFrom);
+    if (createdTo) params.set("createdTo", createdTo);
+    if (hasNotes !== "any") params.set("hasNotes", hasNotes);
+    if (presetTagFilter) params.set("presetTag", presetTagFilter);
     params.set("tagMatchMode", tagMatchMode);
     filterTags.forEach((t) => params.append("tag", t));
     setListLoading(true);
@@ -93,7 +101,7 @@ export default function LibraryPage() {
     }, 250);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, search, filterTags]);
+  }, [ready, search, filterTags, createdFrom, createdTo, hasNotes, presetTagFilter]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -129,12 +137,70 @@ export default function LibraryPage() {
             : filterTags.some((ft) => m.tags.includes(ft));
         if (!ok) return false;
       }
+      if (createdFrom) {
+        const fromDate = new Date(`${createdFrom}T00:00:00.000Z`);
+        if (!Number.isNaN(fromDate.getTime()) && new Date(m.createdAt).getTime() < fromDate.getTime()) {
+          return false;
+        }
+      }
+      if (createdTo) {
+        const toDate = new Date(`${createdTo}T23:59:59.999Z`);
+        if (!Number.isNaN(toDate.getTime()) && new Date(m.createdAt).getTime() > toDate.getTime()) {
+          return false;
+        }
+      }
+      if (hasNotes === "yes" && !m.notes.trim()) return false;
+      if (hasNotes === "no" && m.notes.trim()) return false;
+      if (presetTagFilter && !m.tags.includes(presetTagFilter)) return false;
       if (!q) return true;
       const inNotes = m.notes.toLowerCase().includes(q);
       const inTags = m.tags.some((t) => t.toLowerCase().includes(q));
       return inNotes || inTags;
     });
-  }, [mistakes, filterTags, tagMatchMode, search]);
+  }, [mistakes, filterTags, tagMatchMode, search, createdFrom, createdTo, hasNotes, presetTagFilter]);
+
+  const suggestedPresetTagFilters = useMemo(() => {
+    const fromRecords = allTags.filter((t) => PRESET_TAG_SET.has(t));
+    return Array.from(new Set([...PRESET_TAGS, ...fromRecords]));
+  }, [allTags]);
+
+  function renderHighlightedText(text: string, queryRaw: string): ReactNode {
+    const query = queryRaw.trim();
+    if (!query) return text;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const parts: ReactNode[] = [];
+    let start = 0;
+    while (start < text.length) {
+      const idx = lowerText.indexOf(lowerQuery, start);
+      if (idx === -1) {
+        parts.push(text.slice(start));
+        break;
+      }
+      if (idx > start) parts.push(text.slice(start, idx));
+      parts.push(
+        <mark key={`${idx}-${start}`} className="rounded bg-[#fff3a3] px-0.5 text-[var(--duo-text)]">
+          {text.slice(idx, idx + query.length)}
+        </mark>,
+      );
+      start = idx + query.length;
+    }
+    return <>{parts}</>;
+  }
+
+  function getNotesSnippet(notes: string, queryRaw: string, radius = 36): string | null {
+    const query = queryRaw.trim();
+    if (!query || !notes) return null;
+    const lowerNotes = notes.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const idx = lowerNotes.indexOf(lowerQuery);
+    if (idx < 0) return null;
+    const start = Math.max(0, idx - radius);
+    const end = Math.min(notes.length, idx + query.length + radius);
+    const prefix = start > 0 ? "..." : "";
+    const suffix = end < notes.length ? "..." : "";
+    return `${prefix}${notes.slice(start, end)}${suffix}`;
+  }
 
   const toggleFilterTag = (t: string) => {
     setFilterTags((prev) =>
@@ -165,7 +231,7 @@ export default function LibraryPage() {
       .map((t) => t.trim())
       .filter(Boolean);
     if ((action === "add_tags" || action === "remove_tags") && tags.length === 0) {
-      showActionNotice("请输入标签（逗号分隔）。");
+      showActionNotice("Please enter tags separated by commas.");
       return;
     }
     if (action === "delete" && !confirm(`Delete ${selectedIds.length} selected mistakes?`)) {
@@ -397,9 +463,66 @@ export default function LibraryPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search notes or tags…"
+          placeholder="Search notes or tags..."
           className="mb-3 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-blue)]"
         />
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="text-xs font-bold text-[var(--duo-text-muted)]">
+            Created from
+            <input
+              type="text"
+              value={createdFrom}
+              onChange={(e) => setCreatedFrom(e.target.value)}
+              placeholder="YYYY-MM-DD"
+              inputMode="numeric"
+              pattern="\d{4}-\d{2}-\d{2}"
+              aria-label="Created from date (YYYY-MM-DD)"
+              className="mt-1 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-blue)]"
+            />
+          </label>
+          <label className="text-xs font-bold text-[var(--duo-text-muted)]">
+            Created to
+            <input
+              type="text"
+              value={createdTo}
+              onChange={(e) => setCreatedTo(e.target.value)}
+              placeholder="YYYY-MM-DD"
+              inputMode="numeric"
+              pattern="\d{4}-\d{2}-\d{2}"
+              aria-label="Created to date (YYYY-MM-DD)"
+              className="mt-1 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-blue)]"
+            />
+          </label>
+        </div>
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="text-xs font-bold text-[var(--duo-text-muted)]">
+            Notes presence
+            <select
+              value={hasNotes}
+              onChange={(e) => setHasNotes(e.target.value as "any" | "yes" | "no")}
+              className="mt-1 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold text-[var(--duo-text)]"
+            >
+              <option value="any">Any</option>
+              <option value="yes">Has notes</option>
+              <option value="no">No notes</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-[var(--duo-text-muted)]">
+            Preset tag
+            <select
+              value={presetTagFilter}
+              onChange={(e) => setPresetTagFilter(e.target.value)}
+              className="mt-1 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold text-[var(--duo-text)]"
+            >
+              <option value="">Any preset tag</option>
+              {suggestedPresetTagFilters.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="mb-2 flex flex-wrap items-center gap-3 text-xs font-bold text-[var(--duo-text-muted)]">
           <span>Tags (multi-select)</span>
           <label className="flex cursor-pointer items-center gap-1">
@@ -442,13 +565,22 @@ export default function LibraryPage() {
             );
           })}
         </div>
-        {(filterTags.length > 0 || search) && (
+        {(filterTags.length > 0 ||
+          search ||
+          createdFrom ||
+          createdTo ||
+          hasNotes !== "any" ||
+          presetTagFilter) && (
           <button
             type="button"
             className="mt-3 text-sm font-bold text-[var(--duo-blue)] underline"
             onClick={() => {
               setFilterTags([]);
               setSearch("");
+              setCreatedFrom("");
+              setCreatedTo("");
+              setHasNotes("any");
+              setPresetTagFilter("");
               setTagMatchMode("any");
               void loadList(1);
             }}
@@ -475,14 +607,14 @@ export default function LibraryPage() {
       {selectedIds.length > 0 && (
         <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <p className="mb-2 text-sm font-extrabold text-[var(--duo-text)]">
-            已选择 {selectedIds.length} 条
+            {selectedIds.length} selected
           </p>
           <div className="mb-2 flex gap-2">
             <input
               type="text"
               value={bulkTagInput}
               onChange={(e) => setBulkTagInput(e.target.value)}
-              placeholder="标签（逗号分隔）"
+              placeholder="Tags (comma separated)"
               className="min-w-0 flex-1 rounded-xl border-2 border-[var(--duo-border)] px-3 py-2 text-sm font-medium outline-none"
             />
             <button
@@ -491,7 +623,7 @@ export default function LibraryPage() {
               className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-xs font-bold"
               onClick={() => void runBulk("add_tags")}
             >
-              批量加标签
+              Add tags in bulk
             </button>
             <button
               type="button"
@@ -499,7 +631,7 @@ export default function LibraryPage() {
               className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-xs font-bold"
               onClick={() => void runBulk("remove_tags")}
             >
-              批量移除标签
+              Remove tags in bulk
             </button>
           </div>
           <div className="flex gap-2">
@@ -509,7 +641,7 @@ export default function LibraryPage() {
               className="flex-1 rounded-xl border-2 border-[#d94848] bg-[#ffe8e8] py-2 text-xs font-bold text-[#c00]"
               onClick={() => void runBulk("delete")}
             >
-              批量删除
+              Delete in bulk
             </button>
             <button
               type="button"
@@ -517,7 +649,7 @@ export default function LibraryPage() {
               className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2 text-xs font-bold"
               onClick={() => void runBulk("export")}
             >
-              批量导出
+              Export in bulk
             </button>
           </div>
         </section>
@@ -559,13 +691,18 @@ export default function LibraryPage() {
                       key={t}
                       className="rounded-lg bg-[#eef7e8] px-2 py-0.5 text-xs font-bold text-[var(--duo-green-dark)]"
                     >
-                      {t}
+                      {renderHighlightedText(t, search)}
                     </span>
                   ))}
                 </div>
                 <p className="line-clamp-2 text-sm font-medium text-[var(--duo-text-muted)]">
-                  {m.notes || "(No notes)"}
+                  {m.notes ? renderHighlightedText(m.notes, search) : "(No notes)"}
                 </p>
+                {search.trim() && getNotesSnippet(m.notes, search) && (
+                  <p className="mt-1 line-clamp-2 text-xs font-medium text-[var(--duo-text-muted)]">
+                    Match: {renderHighlightedText(getNotesSnippet(m.notes, search) ?? "", search)}
+                  </p>
+                )}
                 <p className="mt-2 text-xs text-[var(--duo-text-muted)]">
                   {new Date(m.createdAt).toLocaleString("en-US")}
                 </p>
