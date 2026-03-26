@@ -26,6 +26,10 @@ type MistakesContextValue = {
     id: string,
     input: { notes: string; tags: string[]; expectedUpdatedAt: string },
   ) => Promise<{ ok: boolean; error?: string; conflict?: boolean }>;
+  replaceMistakeImage: (
+    id: string,
+    input: { file: File; expectedUpdatedAt: string },
+  ) => Promise<{ ok: boolean; error?: string; conflict?: boolean }>;
   removeMistake: (id: string) => Promise<{ ok: boolean; error?: string }>;
   refetchMistakes: () => Promise<void>;
   ready: boolean;
@@ -157,6 +161,34 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const replaceMistakeImage = useCallback(
+    async (id: string, input: { file: File; expectedUpdatedAt: string }) => {
+      try {
+        const fd = new FormData();
+        fd.set("image", input.file);
+        fd.set("expectedUpdatedAt", input.expectedUpdatedAt);
+        const result = await apiFetchJson<{ mistake?: MistakeEntry }>(
+          `/api/mistakes/${encodeURIComponent(id)}/image`,
+          { method: "POST", body: fd },
+        );
+        if (!result.ok) {
+          return {
+            ok: false as const,
+            error: result.error ?? "Could not replace image.",
+            conflict: result.status === 409,
+          };
+        }
+        if (result.data.mistake) {
+          setMistakes((prev) => prev.map((m) => (m.id === id ? result.data.mistake! : m)));
+        }
+        return { ok: true as const };
+      } catch {
+        return { ok: false as const, error: "Network error while uploading." };
+      }
+    },
+    [],
+  );
+
   const removeMistake = useCallback(async (id: string) => {
     try {
       const result = await apiFetchJson<{ ok?: boolean }>(`/api/mistakes/${encodeURIComponent(id)}`, {
@@ -180,6 +212,7 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       mistakes,
       addMistake,
       updateMistake,
+      replaceMistakeImage,
       removeMistake,
       refetchMistakes,
       ready,
@@ -191,6 +224,7 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       mistakes,
       addMistake,
       updateMistake,
+      replaceMistakeImage,
       removeMistake,
       refetchMistakes,
       ready,

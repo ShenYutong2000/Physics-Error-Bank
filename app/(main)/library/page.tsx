@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
@@ -13,6 +13,7 @@ export default function LibraryPage() {
     mistakes,
     removeMistake,
     updateMistake,
+    replaceMistakeImage,
     refetchMistakes,
     ready,
     loading,
@@ -28,6 +29,9 @@ export default function LibraryPage() {
   const [editCustomTag, setEditCustomTag] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const replaceImageInputRef = useRef<HTMLInputElement>(null);
+  const [replaceImageSaving, setReplaceImageSaving] = useState(false);
+  const [replaceImageError, setReplaceImageError] = useState<string | null>(null);
   const {
     conflictNotice,
     actionNotice,
@@ -85,6 +89,7 @@ export default function LibraryPage() {
     setDetailId(m.id);
     setEditing(false);
     setEditError(null);
+    setReplaceImageError(null);
     clearAllNotices();
     setEditCustomTag("");
     setEditNotes(m.notes);
@@ -157,7 +162,33 @@ export default function LibraryPage() {
     setDetailId(null);
     setEditing(false);
     setEditError(null);
+    setReplaceImageError(null);
     clearAllNotices();
+  }
+
+  async function onReplaceImageFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !detailId || !detail) return;
+    setReplaceImageError(null);
+    setReplaceImageSaving(true);
+    const result = await replaceMistakeImage(detailId, {
+      file,
+      expectedUpdatedAt: detail.updatedAt,
+    });
+    setReplaceImageSaving(false);
+    if (!result.ok) {
+      if (result.conflict) {
+        await refetchMistakes();
+        showConflictNotice(
+          "This mistake was updated elsewhere. Latest content has been reloaded. Try replacing the image again.",
+        );
+        return;
+      }
+      setReplaceImageError(result.error ?? "Could not replace image.");
+      return;
+    }
+    clearConflictNotice();
   }
 
   if (!ready) {
@@ -190,8 +221,8 @@ export default function LibraryPage() {
         </p>
         <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Library</h1>
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
-          Browse and filter by tags—see which categories show up most often. Edit notes and tags in
-          details.
+          Browse and filter by tags—see which categories show up most often. In details you can edit
+          notes and tags, or replace the problem image with a clearer photo.
         </p>
       </header>
       {actionNotice && (
@@ -397,6 +428,29 @@ export default function LibraryPage() {
                   alt="Problem"
                   className="max-h-[50vh] w-full object-contain"
                 />
+              </div>
+              <div className="mt-3">
+                <input
+                  ref={replaceImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(ev) => void onReplaceImageFile(ev)}
+                />
+                <button
+                  type="button"
+                  disabled={replaceImageSaving}
+                  className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2.5 text-sm font-bold text-[var(--duo-text)] disabled:opacity-60"
+                  aria-label="Replace problem image with a new photo"
+                  onClick={() => replaceImageInputRef.current?.click()}
+                >
+                  {replaceImageSaving ? "Uploading new image…" : "Replace image"}
+                </button>
+                {replaceImageError && (
+                  <p className="mt-2 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
+                    {replaceImageError}
+                  </p>
+                )}
               </div>
 
               {!editing ? (

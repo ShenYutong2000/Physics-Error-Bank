@@ -145,6 +145,41 @@ export async function updateMistakeForUser(
   return result;
 }
 
+export async function replaceMistakeImageForUser(
+  userId: string,
+  mistakeId: string,
+  input: { newImageKey: string; expectedUpdatedAt: string },
+): Promise<
+  | { kind: "ok"; mistake: MistakeEntry; oldImageKey: string }
+  | { kind: "not_found" }
+  | { kind: "conflict" }
+> {
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.mistake.findFirst({
+      where: { id: mistakeId, userId },
+      select: { id: true, imageKey: true, updatedAt: true },
+    });
+    if (!existing) return { kind: "not_found" as const };
+    if (existing.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+      return { kind: "conflict" as const };
+    }
+    await tx.mistake.update({
+      where: { id: mistakeId },
+      data: { imageKey: input.newImageKey },
+    });
+    const full = await tx.mistake.findUniqueOrThrow({
+      where: { id: mistakeId },
+      include: { mistakeTags: { include: { tag: true } } },
+    });
+    return {
+      kind: "ok" as const,
+      mistake: rowToEntry(full),
+      oldImageKey: existing.imageKey,
+    };
+  });
+  return result;
+}
+
 export async function deleteMistakeForUser(
   userId: string,
   mistakeId: string,
