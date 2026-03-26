@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { DuoNav } from "@/components/duo-nav";
 
 type Props = {
@@ -37,6 +38,12 @@ export function MainShell({ email, children }: Props) {
             <span className="hidden max-w-[10rem] truncate text-xs font-bold text-[var(--duo-text-muted)] sm:inline">
               {email}
             </span>
+            <Link
+              href="/settings/password"
+              className="rounded-xl border-b-4 border-[#d9d9d9] bg-[var(--duo-surface)] px-3 py-2 text-xs font-extrabold text-[var(--duo-text)] active:translate-y-0.5 active:border-b-2 sm:text-sm"
+            >
+              Password
+            </Link>
             <button
               type="button"
               onClick={() => void logout()}

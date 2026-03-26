@@ -14,7 +14,13 @@ import { createRegisteredUser } from "@/lib/users-repo";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: { email?: string; password?: string };
+  let body: {
+    email?: string;
+    password?: string;
+    recoveryAnswer1?: string;
+    recoveryAnswer2?: string;
+    recoveryAnswer3?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -23,9 +29,19 @@ export async function POST(request: Request) {
 
   const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const recoveryAnswer1 = typeof body.recoveryAnswer1 === "string" ? body.recoveryAnswer1 : "";
+  const recoveryAnswer2 = typeof body.recoveryAnswer2 === "string" ? body.recoveryAnswer2 : "";
+  const recoveryAnswer3 = typeof body.recoveryAnswer3 === "string" ? body.recoveryAnswer3 : "";
 
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  }
+
+  if (!recoveryAnswer1 || !recoveryAnswer2 || !recoveryAnswer3) {
+    return NextResponse.json(
+      { error: "All three security questions must be answered." },
+      { status: 400 },
+    );
   }
 
   if (!isValidEmail(email)) {
@@ -58,7 +74,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const created = await createRegisteredUser(email, password);
+  const created = await createRegisteredUser(email, password, [
+    recoveryAnswer1,
+    recoveryAnswer2,
+    recoveryAnswer3,
+  ]);
   if (!created.ok) {
     return NextResponse.json({ error: created.error }, { status: 409 });
   }
