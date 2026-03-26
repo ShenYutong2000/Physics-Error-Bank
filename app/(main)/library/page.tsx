@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import { PRESET_TAGS } from "@/lib/types";
+import { PRESET_TAGS, TAG_GROUPS } from "@/lib/types";
 import { useLibraryNotices } from "./use-library-notices";
 
 export default function LibraryPage() {
@@ -48,6 +49,12 @@ export default function LibraryPage() {
     PRESET_TAGS.forEach((t) => set.add(t));
     return Array.from(set).sort((a, b) => a.localeCompare(b, "en"));
   }, [mistakes]);
+  const editSuggestedTags = useMemo(() => {
+    const q = editCustomTag.trim().toLowerCase();
+    const pool = allTags.filter((t) => !editTags.includes(t));
+    if (!q) return pool.slice(0, 6);
+    return pool.filter((t) => t.toLowerCase().includes(q)).slice(0, 6);
+  }, [allTags, editCustomTag, editTags]);
 
   const tagCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -223,6 +230,11 @@ export default function LibraryPage() {
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
           Browse and filter by tags—see which categories show up most often. In details you can edit
           notes and tags, or replace the problem image with a clearer photo.
+        </p>
+        <p className="mt-2 text-xs font-bold text-[var(--duo-blue)]">
+          <Link href="/tags" className="underline">
+            Open tag management
+          </Link>
         </p>
       </header>
       {actionNotice && (
@@ -485,27 +497,37 @@ export default function LibraryPage() {
                 <div className="mt-4 space-y-4">
                   <div>
                     <h3 className="mb-2 text-sm font-bold text-[var(--duo-text)]">Tags</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {PRESET_TAGS.map((t) => {
-                        const on = editTags.includes(t);
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => toggleEditPreset(t)}
-                            className={`rounded-xl border-2 px-3 py-2 text-sm font-bold ${
-                              on
-                                ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                                : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)]"
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        );
-                      })}
+                    <div className="space-y-4">
+                      {TAG_GROUPS.map((group) => (
+                        <div key={group.theme}>
+                          <h4 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
+                            {group.theme}
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {group.tags.map((t) => {
+                              const on = editTags.includes(t);
+                              return (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => toggleEditPreset(t)}
+                                  className={`rounded-xl border-2 px-3 py-2 text-sm font-bold ${
+                                    on
+                                      ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                                      : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)]"
+                                  }`}
+                                >
+                                  {t}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     <div className="mt-3 flex gap-2">
                       <input
+                        list="library-known-tags"
                         type="text"
                         value={editCustomTag}
                         onChange={(e) => setEditCustomTag(e.target.value)}
@@ -523,6 +545,28 @@ export default function LibraryPage() {
                         Add
                       </button>
                     </div>
+                    <datalist id="library-known-tags">
+                      {allTags.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
+                    {editSuggestedTags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {editSuggestedTags.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => {
+                              if (!editTags.includes(t)) setEditTags((prev) => [...prev, t]);
+                              setEditCustomTag("");
+                            }}
+                            className="rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-1 text-xs font-bold text-[var(--duo-text)]"
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h3 className="mb-2 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>

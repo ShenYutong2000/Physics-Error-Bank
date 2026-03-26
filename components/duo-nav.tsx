@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const items = [
   { href: "/add", label: "Add", icon: CameraIcon },
   { href: "/library", label: "Library", icon: BooksIcon },
+  { href: "/tags", label: "Tags", icon: TagIcon },
 ] as const;
 
 export function DuoNav() {
@@ -62,6 +63,15 @@ function BooksIcon({ className }: { className?: string }) {
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       <path d="M8 7h8M8 11h6" />
+    </svg>
+  );
+}
+
+function TagIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M20.59 13.41 12 22l-9-9V2h11l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <circle cx="7.5" cy="7.5" r="1.5" />
     </svg>
   );
 }

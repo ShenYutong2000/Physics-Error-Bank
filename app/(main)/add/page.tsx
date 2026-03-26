@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { compressImageForUpload } from "@/lib/image-compress";
-import { PRESET_TAGS } from "@/lib/types";
+import { PRESET_TAGS, TAG_GROUPS } from "@/lib/types";
 
 export default function AddMistakePage() {
   const router = useRouter();
-  const { addMistake, ready, saving, loadError } = useMistakes();
+  const { addMistake, mistakes, ready, saving, loadError } = useMistakes();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
 
@@ -53,6 +54,22 @@ export default function AddMistakePage() {
     if (!tags.includes(t)) setTags((prev) => [...prev, t]);
     setCustomTag("");
   };
+
+  const knownTags = Array.from(
+    new Set([
+      ...PRESET_TAGS,
+      ...mistakes.flatMap((m) => m.tags),
+    ]),
+  ).sort((a, b) => a.localeCompare(b, "en"));
+  const suggestedCustomTags = customTag.trim()
+    ? knownTags
+        .filter(
+          (t) =>
+            !tags.includes(t) &&
+            t.toLowerCase().includes(customTag.trim().toLowerCase()),
+        )
+        .slice(0, 6)
+    : knownTags.filter((t) => !tags.includes(t)).slice(0, 6);
 
   const submit = async () => {
     setError(null);
@@ -165,27 +182,42 @@ export default function AddMistakePage() {
 
       <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Tags</h2>
-        <div className="flex flex-wrap gap-2">
-          {PRESET_TAGS.map((t) => {
-            const on = tags.includes(t);
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => togglePreset(t)}
-                className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition-colors ${
-                  on
-                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                    : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#eef7e8]"
-                }`}
-              >
-                {t}
-              </button>
-            );
-          })}
+        <div className="mb-3 flex justify-end">
+          <Link href="/tags" className="text-xs font-bold text-[var(--duo-blue)] underline">
+            Manage tags
+          </Link>
+        </div>
+        <div className="space-y-4">
+          {TAG_GROUPS.map((group) => (
+            <div key={group.theme}>
+              <h3 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
+                {group.theme}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {group.tags.map((t) => {
+                  const on = tags.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => togglePreset(t)}
+                      className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition-colors ${
+                        on
+                          ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                          : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#eef7e8]"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="mt-4 flex gap-2">
           <input
+            list="known-tags"
             type="text"
             value={customTag}
             onChange={(e) => setCustomTag(e.target.value)}
@@ -201,6 +233,28 @@ export default function AddMistakePage() {
             Add
           </button>
         </div>
+        <datalist id="known-tags">
+          {knownTags.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+        {suggestedCustomTags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {suggestedCustomTags.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  if (!tags.includes(t)) setTags((prev) => [...prev, t]);
+                  setCustomTag("");
+                }}
+                className="rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-1 text-xs font-bold text-[var(--duo-text)]"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
         {tags.filter((t) => !(PRESET_TAGS as readonly string[]).includes(t)).length > 0 && (
           <p className="mt-2 text-xs font-medium text-[var(--duo-text-muted)]">
             Custom tags:{" "}
