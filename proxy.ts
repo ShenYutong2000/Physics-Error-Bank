@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { getAuthSecret } from "@/lib/auth-config";
 import { sessionCookieName, verifySession } from "@/lib/session";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(sessionCookieName())?.value;
   const secret = getAuthSecret();
   if (!token || !secret) {
@@ -17,5 +17,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/add", "/add/:path*", "/library", "/library/:path*"],
+  matcher: [
+    "/add",
+    "/add/:path*",
+    "/library",
+    "/library/:path*",
+    "/settings",
+    "/settings/:path*",
+  ],
 };

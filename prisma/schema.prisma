@@ -13,12 +13,16 @@ datasource db {
 
 /// Registered student accounts (source of truth for auth).
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  mistakes     Mistake[]
-  tags         Tag[]
+  id                    String    @id @default(uuid()) @db.Uuid
+  email                 String    @unique
+  passwordHash          String    @map("password_hash")
+  /// Hashed with the same scrypt format as passwords; used for forgot-password flow.
+  recoveryAnswer1Hash   String?   @map("recovery_answer_1_hash")
+  recoveryAnswer2Hash   String?   @map("recovery_answer_2_hash")
+  recoveryAnswer3Hash   String?   @map("recovery_answer_3_hash")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  mistakes              Mistake[]
+  tags                  Tag[]
 
   @@map("users")
 }
