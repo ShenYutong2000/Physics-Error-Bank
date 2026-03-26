@@ -34,6 +34,9 @@ model Mistake {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   notes       String       @default("")
   imageKey    String       @map("image_key") @db.VarChar(1024)
+  /// Manual review only: incremented when the user marks a review; no scheduled next review.
+  reviewCount Int          @default(0) @map("review_count")
+  lastReviewedAt DateTime? @map("last_reviewed_at")
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   mistakeTags MistakeTag[]

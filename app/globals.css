@@ -26,17 +26,145 @@ body {
   color: var(--foreground);
 }
 
+/* Soft mesh behind main app content (see MainShell). */
+.duo-page-bg {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -15%, rgba(88, 204, 2, 0.14), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 100% 35%, rgba(28, 176, 246, 0.1), transparent 50%),
+    radial-gradient(ellipse 45% 35% at 0% 75%, rgba(255, 200, 0, 0.08), transparent 45%),
+    var(--background);
+}
+
+.duo-card {
+  border-radius: 1rem;
+  border: 2px solid var(--duo-border);
+  background: #fff;
+  box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.06);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.duo-card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 0 rgba(0, 0, 0, 0.07);
+}
+
+.duo-card-interactive:active {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 0 rgba(0, 0, 0, 0.06);
+}
+
+.duo-fade-in {
+  animation: duo-fade-in 0.45s ease-out both;
+}
+
+@keyframes duo-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.duo-title-gradient {
+  background: linear-gradient(
+    105deg,
+    var(--duo-green-dark) 0%,
+    var(--duo-green) 40%,
+    var(--duo-blue) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.duo-spinner {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 3px solid var(--duo-border);
+  border-top-color: var(--duo-green);
+  border-radius: 50%;
+  animation: duo-spin 0.65s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes duo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.duo-modal-backdrop {
+  animation: duo-backdrop-in 0.2s ease-out both;
+}
+
+@keyframes duo-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.duo-modal-surface {
+  animation: duo-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes duo-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.duo-stat-bar-fill {
+  transform-origin: left center;
+  animation: duo-bar-grow 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes duo-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 .duo-btn-primary {
   border-radius: 1rem;
   border-bottom: 4px solid var(--duo-green-shadow);
   background-color: var(--duo-green);
   font-weight: 800;
   color: white;
-  transition: transform 0.05s ease, border-bottom-width 0.05s ease;
+  transition:
+    transform 0.05s ease,
+    border-bottom-width 0.05s ease,
+    filter 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.04);
 }
 
 .duo-btn-primary:hover {
-  filter: brightness(1.03);
+  filter: brightness(1.04);
+  box-shadow: 0 3px 8px rgba(70, 163, 2, 0.35);
+}
+
+.duo-btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(28, 176, 246, 0.45),
+    0 3px 8px rgba(70, 163, 2, 0.3);
 }
 
 .duo-btn-primary:active {
@@ -80,4 +208,46 @@ body {
   bottom: 18%;
   background: #89e219;
   border: 4px solid rgba(255, 255, 255, 0.35);
+}
+
+.login-blob--a {
+  animation: duo-login-drift-a 10s ease-in-out infinite;
+}
+
+.login-blob--b {
+  animation: duo-login-drift-b 12s ease-in-out infinite;
+}
+
+.login-blob--c {
+  animation: duo-login-drift-c 11s ease-in-out infinite;
+}
+
+@keyframes duo-login-drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(12px, -10px);
+  }
+}
+
+@keyframes duo-login-drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-10px, 8px);
+  }
+}
+
+@keyframes duo-login-drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6px, -14px) scale(1.05);
+  }
 }

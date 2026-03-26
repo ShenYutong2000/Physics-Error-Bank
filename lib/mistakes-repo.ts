@@ -11,6 +11,8 @@ export function rowToEntry(
     id: string;
     notes: string;
     imageKey: string;
+    reviewCount: number;
+    lastReviewedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
     mistakeTags: { tag: { name: string } }[];
@@ -21,6 +23,8 @@ export function rowToEntry(
     imageUrl: imagePublicPath(m.imageKey),
     tags: m.mistakeTags.map((mt) => mt.tag.name),
     notes: m.notes,
+    reviewCount: m.reviewCount,
+    lastReviewedAt: m.lastReviewedAt ? m.lastReviewedAt.toISOString() : null,
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
   };
@@ -135,6 +139,39 @@ export async function updateMistakeForUser(
     });
     await assignTagsToMistake(tx, userId, mistakeId, names);
     await cleanupOrphanTags(tx, userId);
+    const full = await tx.mistake.findUniqueOrThrow({
+      where: { id: mistakeId },
+      include: { mistakeTags: { include: { tag: true } } },
+    });
+    return { kind: "ok" as const, mistake: rowToEntry(full) };
+  });
+
+  return result;
+}
+
+export async function recordManualReviewForUser(
+  userId: string,
+  mistakeId: string,
+  input: { expectedUpdatedAt: string },
+): Promise<{ kind: "ok"; mistake: MistakeEntry } | { kind: "not_found" } | { kind: "conflict" }> {
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.mistake.findFirst({
+      where: { id: mistakeId, userId },
+      select: { id: true, updatedAt: true },
+    });
+    if (!existing) return { kind: "not_found" as const };
+    if (existing.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+      return { kind: "conflict" as const };
+    }
+
+    await tx.mistake.update({
+      where: { id: mistakeId },
+      data: {
+        reviewCount: { increment: 1 },
+        lastReviewedAt: new Date(),
+      },
+    });
+
     const full = await tx.mistake.findUniqueOrThrow({
       where: { id: mistakeId },
       include: { mistakeTags: { include: { tag: true } } },

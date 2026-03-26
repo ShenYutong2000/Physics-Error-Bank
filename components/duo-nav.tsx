@@ -13,7 +13,7 @@ export function DuoNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_0_rgba(0,0,0,0.06)]"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-white/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.06)] backdrop-blur-md"
       aria-label="Main navigation"
     >
       <div className="mx-auto flex max-w-lg justify-around px-4">
@@ -23,20 +23,20 @@ export function DuoNav() {
             <Link
               key={href}
               href={href}
-              className={`flex min-w-[5rem] flex-col items-center gap-1 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+              className={`flex min-w-[5rem] flex-col items-center gap-1 rounded-xl px-4 py-2 text-sm font-bold transition-all duration-200 ${
                 active
                   ? "text-[var(--duo-green-dark)]"
                   : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
               }`}
             >
               <span
-                className={`flex h-10 w-10 items-center justify-center rounded-2xl border-b-4 transition-transform active:translate-y-0.5 active:border-b-2 ${
+                className={`flex h-10 w-10 items-center justify-center rounded-2xl border-b-4 transition-all duration-200 active:translate-y-0.5 active:border-b-2 ${
                   active
-                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                    : "border-[#e5e5e5] bg-[var(--duo-surface)] text-[var(--duo-text-muted)]"
+                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white shadow-[0_4px_0_rgba(0,0,0,0.12)]"
+                    : "border-[#e5e5e5] bg-[var(--duo-surface)] text-[var(--duo-text-muted)] hover:scale-105 hover:border-[#d0d0d0] hover:shadow-sm"
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={`h-5 w-5 ${active ? "drop-shadow-sm" : ""}`} />
               </span>
               {label}
             </Link>

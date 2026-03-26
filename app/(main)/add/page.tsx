@@ -94,16 +94,17 @@ export default function AddMistakePage() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-[var(--duo-text-muted)]">
-        Loading…
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-[var(--duo-text-muted)]">
+        <span className="duo-spinner" aria-hidden />
+        <span className="text-sm font-bold">Loading…</span>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className="duo-fade-in mx-auto max-w-lg px-4 pb-28 pt-6">
       {loadError && (
-        <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60]">
+        <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60] shadow-[0_3px_0_rgba(0,0,0,0.06)]">
           {loadError}
         </p>
       )}
@@ -111,7 +112,7 @@ export default function AddMistakePage() {
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-green-dark)]">
           Today’s mistakes
         </p>
-        <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">
+        <h1 className="duo-title-gradient mt-1 text-2xl font-extrabold tracking-tight">
           Add a mistake
         </h1>
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
@@ -119,7 +120,7 @@ export default function AddMistakePage() {
         </p>
       </header>
 
-      <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="duo-card mb-6 p-4">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Problem image</h2>
         <input
           ref={fileInputRef}
@@ -152,7 +153,7 @@ export default function AddMistakePage() {
           )}
         </div>
         {previewUrl && (
-          <div className="mt-4 overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
+          <div className="mt-4 overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-gradient-to-b from-white to-[var(--duo-surface)] shadow-inner">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewUrl}
@@ -163,7 +164,7 @@ export default function AddMistakePage() {
         )}
       </section>
 
-      <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="duo-card mb-6 p-4">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Tags</h2>
         <div className="flex flex-wrap gap-2">
           {PRESET_TAGS.map((t) => {
@@ -173,10 +174,10 @@ export default function AddMistakePage() {
                 key={t}
                 type="button"
                 onClick={() => togglePreset(t)}
-                className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition-colors ${
+                className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition-all duration-150 ${
                   on
-                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                    : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#eef7e8]"
+                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white shadow-[0_3px_0_rgba(0,0,0,0.12)]"
+                    : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#eef7e8] hover:shadow-sm active:scale-[0.98]"
                 }`}
               >
                 {t}
@@ -209,7 +210,7 @@ export default function AddMistakePage() {
         )}
       </section>
 
-      <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="duo-card mb-6 p-4">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h2>
         <textarea
           value={notes}

@@ -5,8 +5,39 @@ import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
 import { TagStatsChart } from "@/components/tag-stats-chart";
+import type { MistakeEntry } from "@/lib/types";
 import { PRESET_TAGS } from "@/lib/types";
 import { useLibraryNotices } from "./use-library-notices";
+
+type ReviewFilter = "all" | "never" | "reviewed";
+type SortMode = "added_desc" | "added_asc" | "last_reviewed_desc" | "never_first";
+
+function sortMistakes(list: MistakeEntry[], sort: SortMode): MistakeEntry[] {
+  const copy = [...list];
+  copy.sort((a, b) => {
+    switch (sort) {
+      case "added_desc":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "added_asc":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      case "last_reviewed_desc": {
+        const ta = a.lastReviewedAt ? new Date(a.lastReviewedAt).getTime() : 0;
+        const tb = b.lastReviewedAt ? new Date(b.lastReviewedAt).getTime() : 0;
+        if (tb !== ta) return tb - ta;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      case "never_first": {
+        const aNever = !a.lastReviewedAt;
+        const bNever = !b.lastReviewedAt;
+        if (aNever !== bNever) return aNever ? -1 : 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      default:
+        return 0;
+    }
+  });
+  return copy;
+}
 
 export default function LibraryPage() {
   const {
@@ -14,6 +45,7 @@ export default function LibraryPage() {
     removeMistake,
     updateMistake,
     replaceMistakeImage,
+    recordManualReview,
     refetchMistakes,
     ready,
     loading,
@@ -22,6 +54,8 @@ export default function LibraryPage() {
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<"all" | "any">("any");
   const [search, setSearch] = useState("");
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("added_desc");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
@@ -32,6 +66,7 @@ export default function LibraryPage() {
   const replaceImageInputRef = useRef<HTMLInputElement>(null);
   const [replaceImageSaving, setReplaceImageSaving] = useState(false);
   const [replaceImageError, setReplaceImageError] = useState<string | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
   const {
     conflictNotice,
     actionNotice,
@@ -62,7 +97,7 @@ export default function LibraryPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return mistakes.filter((m) => {
+    const matched = mistakes.filter((m) => {
       if (filterTags.length > 0) {
         const ok =
           tagMatchMode === "all"
@@ -70,12 +105,15 @@ export default function LibraryPage() {
             : filterTags.some((ft) => m.tags.includes(ft));
         if (!ok) return false;
       }
+      if (reviewFilter === "never" && m.lastReviewedAt) return false;
+      if (reviewFilter === "reviewed" && !m.lastReviewedAt) return false;
       if (!q) return true;
       const inNotes = m.notes.toLowerCase().includes(q);
       const inTags = m.tags.some((t) => t.toLowerCase().includes(q));
       return inNotes || inTags;
     });
-  }, [mistakes, filterTags, tagMatchMode, search]);
+    return sortMistakes(matched, sortMode);
+  }, [mistakes, filterTags, tagMatchMode, search, reviewFilter, sortMode]);
 
   const toggleFilterTag = (t: string) => {
     setFilterTags((prev) =>
@@ -191,16 +229,36 @@ export default function LibraryPage() {
     clearConflictNotice();
   }
 
+  async function onMarkReviewed() {
+    if (!detailId || !detail) return;
+    setReviewSaving(true);
+    const result = await recordManualReview(detailId, { expectedUpdatedAt: detail.updatedAt });
+    setReviewSaving(false);
+    if (!result.ok) {
+      if (result.conflict) {
+        await refetchMistakes();
+        showConflictNotice(
+          "This mistake was updated elsewhere. Latest content has been reloaded. Try marking review again.",
+        );
+        return;
+      }
+      showActionNotice(result.error ?? "Could not record review.");
+      return;
+    }
+    clearConflictNotice();
+  }
+
   if (!ready) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-[var(--duo-text-muted)]">
-        Loading…
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-[var(--duo-text-muted)]">
+        <span className="duo-spinner" aria-hidden />
+        <span className="text-sm font-bold">Loading…</span>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className="duo-fade-in mx-auto max-w-lg px-4 pb-28 pt-6">
       {loadError && (
         <NoticeBanner
           tone="warning"
@@ -219,10 +277,11 @@ export default function LibraryPage() {
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">
           Your progress
         </p>
-        <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Library</h1>
+        <h1 className="duo-title-gradient mt-1 text-2xl font-extrabold tracking-tight">Library</h1>
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
-          Browse and filter by tags—see which categories show up most often. In details you can edit
-          notes and tags, or replace the problem image with a clearer photo.
+          Browse and filter by tags—see which categories show up most often. Mark a manual review when
+          you revisit a mistake (no automatic schedules). Edit notes/tags or replace the image in
+          details.
         </p>
       </header>
       {actionNotice && (
@@ -234,9 +293,9 @@ export default function LibraryPage() {
         />
       )}
 
-      <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="duo-card mb-6 p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--duo-text)]">
-          <span className="text-lg" aria-hidden>
+          <span className="text-lg drop-shadow-sm" aria-hidden>
             📊
           </span>
           Tag stats (top 10)
@@ -244,7 +303,7 @@ export default function LibraryPage() {
         <TagStatsChart rows={tagCounts} />
       </section>
 
-      <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="duo-card mb-4 p-4">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Filter & search</h2>
         <input
           type="search"
@@ -284,10 +343,10 @@ export default function LibraryPage() {
                 key={t}
                 type="button"
                 onClick={() => toggleFilterTag(t)}
-                className={`rounded-lg border-2 px-2 py-1 text-xs font-bold ${
+                className={`rounded-lg border-2 px-2 py-1 text-xs font-bold transition-all duration-150 ${
                   on
-                    ? "border-[var(--duo-blue-shadow)] bg-[var(--duo-blue)] text-white"
-                    : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)]"
+                    ? "border-[var(--duo-blue-shadow)] bg-[var(--duo-blue)] text-white shadow-[0_2px_0_rgba(0,0,0,0.1)]"
+                    : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:scale-105 hover:shadow-sm active:scale-95"
                 }`}
               >
                 {t}
@@ -295,7 +354,36 @@ export default function LibraryPage() {
             );
           })}
         </div>
-        {(filterTags.length > 0 || search) && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-[var(--duo-text-muted)]">
+              Manual review
+            </span>
+            <select
+              value={reviewFilter}
+              onChange={(e) => setReviewFilter(e.target.value as ReviewFilter)}
+              className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold text-[var(--duo-text)] outline-none focus:border-[var(--duo-blue)]"
+            >
+              <option value="all">All mistakes</option>
+              <option value="never">Never reviewed</option>
+              <option value="reviewed">Reviewed at least once</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-[var(--duo-text-muted)]">Sort by</span>
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold text-[var(--duo-text)] outline-none focus:border-[var(--duo-blue)]"
+            >
+              <option value="added_desc">Added (newest first)</option>
+              <option value="added_asc">Added (oldest first)</option>
+              <option value="last_reviewed_desc">Last reviewed (recent first)</option>
+              <option value="never_first">Never reviewed first</option>
+            </select>
+          </label>
+        </div>
+        {(filterTags.length > 0 || search || reviewFilter !== "all" || sortMode !== "added_desc") && (
           <button
             type="button"
             className="mt-3 text-sm font-bold text-[var(--duo-blue)] underline"
@@ -303,6 +391,8 @@ export default function LibraryPage() {
               setFilterTags([]);
               setSearch("");
               setTagMatchMode("any");
+              setReviewFilter("all");
+              setSortMode("added_desc");
             }}
           >
             Clear all filters
@@ -319,18 +409,18 @@ export default function LibraryPage() {
         {filtered.map((m) => (
           <li
             key={m.id}
-            className="overflow-hidden rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+            className="duo-card duo-card-interactive group overflow-hidden"
           >
             <button
               type="button"
               className="block w-full text-left"
               onClick={() => openDetail(m)}
             >
-              <div className="relative aspect-[4/3] w-full bg-[var(--duo-surface)]">
+              <div className="relative aspect-[4/3] w-full bg-gradient-to-b from-[#fafafa] to-[var(--duo-surface)]">
                 <RetryableImage
                   src={m.imageUrl}
                   alt=""
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
                 />
               </div>
               <div className="p-3">
@@ -348,7 +438,12 @@ export default function LibraryPage() {
                   {m.notes || "(No notes)"}
                 </p>
                 <p className="mt-2 text-xs text-[var(--duo-text-muted)]">
-                  {new Date(m.createdAt).toLocaleString("en-US")}
+                  Added {new Date(m.createdAt).toLocaleString("en-US")}
+                </p>
+                <p className="mt-1 text-xs font-bold text-[var(--duo-green-dark)]">
+                  {m.lastReviewedAt
+                    ? `Reviewed ${m.reviewCount}× · Last ${new Date(m.lastReviewedAt).toLocaleDateString("en-US")}`
+                    : "Not reviewed yet"}
                 </p>
               </div>
             </button>
@@ -381,8 +476,11 @@ export default function LibraryPage() {
       </ul>
 
       {filtered.length === 0 && !loadError && (
-        <div className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-12 text-center">
-          <p className="text-lg font-extrabold text-[var(--duo-text)]">Nothing here yet</p>
+        <div className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-gradient-to-br from-white via-[var(--duo-surface)] to-[#eef7e8] px-4 py-14 text-center shadow-inner">
+          <p className="text-4xl drop-shadow-sm" aria-hidden>
+            📚
+          </p>
+          <p className="mt-3 text-lg font-extrabold text-[var(--duo-text)]">Nothing here yet</p>
           <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
             Loosen your filters or add your first mistake under Add.
           </p>
@@ -391,13 +489,13 @@ export default function LibraryPage() {
 
       {detail && (
         <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="duo-modal-backdrop fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-4 backdrop-blur-[2px] sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="detail-title"
           onClick={(e) => e.target === e.currentTarget && closeDetail()}
         >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-xl">
+          <div className="duo-modal-surface max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-2xl shadow-black/15">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b-2 border-[var(--duo-border)] bg-white px-4 py-3">
               <h2 id="detail-title" className="text-lg font-extrabold text-[var(--duo-text)]">
                 Mistake details
@@ -475,6 +573,28 @@ export default function LibraryPage() {
                         {t}
                       </span>
                     ))}
+                  </div>
+                  <div className="mt-4 rounded-xl border-2 border-[var(--duo-green-shadow)]/30 bg-gradient-to-br from-[#f4fce8] to-[var(--duo-surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                    <h3 className="text-sm font-bold text-[var(--duo-text)]">Manual review</h3>
+                    <p className="mt-1 text-sm font-medium text-[var(--duo-text-muted)]">
+                      {detail.lastReviewedAt ? (
+                        <>
+                          You marked this <span className="font-bold text-[var(--duo-text)]">{detail.reviewCount}</span>{" "}
+                          time{detail.reviewCount === 1 ? "" : "s"}. Last:{" "}
+                          {new Date(detail.lastReviewedAt).toLocaleString("en-US")}
+                        </>
+                      ) : (
+                        <>Not reviewed yet. When you revisit this mistake, tap the button below.</>
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={reviewSaving}
+                      className="duo-btn-primary mt-3 w-full py-3 text-sm disabled:opacity-60"
+                      onClick={() => void onMarkReviewed()}
+                    >
+                      {reviewSaving ? "Saving…" : "Mark as reviewed"}
+                    </button>
                   </div>
                   <h3 className="mt-4 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>
                   <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-[var(--duo-text-muted)]">

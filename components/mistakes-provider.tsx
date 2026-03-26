@@ -30,6 +30,10 @@ type MistakesContextValue = {
     id: string,
     input: { file: File; expectedUpdatedAt: string },
   ) => Promise<{ ok: boolean; error?: string; conflict?: boolean }>;
+  recordManualReview: (
+    id: string,
+    input: { expectedUpdatedAt: string },
+  ) => Promise<{ ok: boolean; error?: string; conflict?: boolean }>;
   removeMistake: (id: string) => Promise<{ ok: boolean; error?: string }>;
   refetchMistakes: () => Promise<void>;
   ready: boolean;
@@ -189,6 +193,35 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const recordManualReview = useCallback(
+    async (id: string, input: { expectedUpdatedAt: string }) => {
+      try {
+        const result = await apiFetchJson<{ mistake?: MistakeEntry }>(
+          `/api/mistakes/${encodeURIComponent(id)}/review`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expectedUpdatedAt: input.expectedUpdatedAt }),
+          },
+        );
+        if (!result.ok) {
+          return {
+            ok: false as const,
+            error: result.error ?? "Could not record review.",
+            conflict: result.status === 409,
+          };
+        }
+        if (result.data.mistake) {
+          setMistakes((prev) => prev.map((m) => (m.id === id ? result.data.mistake! : m)));
+        }
+        return { ok: true as const };
+      } catch {
+        return { ok: false as const, error: "Network error while recording review." };
+      }
+    },
+    [],
+  );
+
   const removeMistake = useCallback(async (id: string) => {
     try {
       const result = await apiFetchJson<{ ok?: boolean }>(`/api/mistakes/${encodeURIComponent(id)}`, {
@@ -213,6 +246,7 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       addMistake,
       updateMistake,
       replaceMistakeImage,
+      recordManualReview,
       removeMistake,
       refetchMistakes,
       ready,
@@ -225,6 +259,7 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
       addMistake,
       updateMistake,
       replaceMistakeImage,
+      recordManualReview,
       removeMistake,
       refetchMistakes,
       ready,

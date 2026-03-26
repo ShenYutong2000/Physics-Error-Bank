@@ -4,6 +4,10 @@ export type MistakeEntry = {
   imageUrl: string;
   tags: string[];
   notes: string;
+  /** How many times the user marked this mistake as reviewed (manual only). */
+  reviewCount: number;
+  /** ISO timestamp of the last manual review, or null if never reviewed. */
+  lastReviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
