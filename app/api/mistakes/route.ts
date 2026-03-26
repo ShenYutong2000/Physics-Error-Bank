@@ -30,6 +30,11 @@ export async function GET(request: Request) {
     .map((t) => t.trim())
     .filter(Boolean);
   const tagMatchMode = url.searchParams.get("tagMatchMode") === "all" ? "all" : "any";
+  const createdFrom = (url.searchParams.get("createdFrom") ?? "").trim();
+  const createdTo = (url.searchParams.get("createdTo") ?? "").trim();
+  const hasNotesRaw = (url.searchParams.get("hasNotes") ?? "any").trim();
+  const hasNotes = hasNotesRaw === "yes" || hasNotesRaw === "no" ? hasNotesRaw : "any";
+  const presetTag = (url.searchParams.get("presetTag") ?? "").trim();
 
   try {
     const result = await listMistakesPageForUser(user.id, {
@@ -39,6 +44,10 @@ export async function GET(request: Request) {
       search,
       filterTags,
       tagMatchMode,
+      createdFrom,
+      createdTo,
+      hasNotes,
+      presetTag,
     });
     return NextResponse.json({
       mistakes: result.rows,

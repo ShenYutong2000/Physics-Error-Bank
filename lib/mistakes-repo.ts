@@ -11,6 +11,10 @@ type ListMistakesInput = {
   search?: string;
   filterTags?: string[];
   tagMatchMode?: "all" | "any";
+  createdFrom?: string;
+  createdTo?: string;
+  hasNotes?: "any" | "yes" | "no";
+  presetTag?: string;
 };
 
 function imagePublicPath(imageKey: string): string {
@@ -96,6 +100,9 @@ function buildListWhere(userId: string, input: ListMistakesInput): Prisma.Mistak
   const where: Prisma.MistakeWhereInput = { userId };
   const search = input.search?.trim();
   const tags = [...new Set((input.filterTags ?? []).map((t) => t.trim()).filter(Boolean))];
+  const createdFrom = input.createdFrom?.trim();
+  const createdTo = input.createdTo?.trim();
+  const presetTag = input.presetTag?.trim();
 
   const andItems: Prisma.MistakeWhereInput[] = [];
   if (search) {
@@ -122,6 +129,38 @@ function buildListWhere(userId: string, input: ListMistakesInput): Prisma.Mistak
         mistakeTags: { some: { tag: { name: { in: tags } } } },
       });
     }
+  }
+  if (createdFrom || createdTo) {
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (createdFrom) {
+      const fromDate = new Date(`${createdFrom}T00:00:00.000Z`);
+      if (!Number.isNaN(fromDate.getTime())) {
+        createdAt.gte = fromDate;
+      }
+    }
+    if (createdTo) {
+      const toDate = new Date(`${createdTo}T23:59:59.999Z`);
+      if (!Number.isNaN(toDate.getTime())) {
+        createdAt.lte = toDate;
+      }
+    }
+    if (Object.keys(createdAt).length > 0) {
+      andItems.push({ createdAt });
+    }
+  }
+  if (input.hasNotes === "yes") {
+    andItems.push({ notes: { not: "" } });
+  } else if (input.hasNotes === "no") {
+    andItems.push({ notes: "" });
+  }
+  if (presetTag) {
+    andItems.push({
+      mistakeTags: {
+        some: {
+          tag: { name: presetTag },
+        },
+      },
+    });
   }
   if (andItems.length > 0) {
     where.AND = andItems;
