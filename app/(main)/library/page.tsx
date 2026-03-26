@@ -1,28 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import { PRESET_TAGS, TAG_GROUPS } from "@/lib/types";
+import { apiFetchJson } from "@/lib/api-client";
+import { PRESET_TAGS, TAG_GROUPS, type MistakeEntry } from "@/lib/types";
 import { useLibraryNotices } from "./use-library-notices";
 
 export default function LibraryPage() {
   const {
-    mistakes,
     removeMistake,
     updateMistake,
     replaceMistakeImage,
-    refetchMistakes,
     ready,
     loading,
     loadError,
   } = useMistakes();
+  const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [hasMore, setHasMore] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<"latest" | "most_wrong" | "recently_edited" | "recently_reviewed">("latest");
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<"all" | "any">("any");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
@@ -42,6 +51,49 @@ export default function LibraryPage() {
     showConflictNotice,
     showActionNotice,
   } = useLibraryNotices();
+
+  async function loadList(nextPage: number) {
+    const params = new URLSearchParams();
+    params.set("page", String(nextPage));
+    params.set("pageSize", String(pageSize));
+    params.set("sort", sortBy);
+    if (search.trim()) params.set("search", search.trim());
+    params.set("tagMatchMode", tagMatchMode);
+    filterTags.forEach((t) => params.append("tag", t));
+    setListLoading(true);
+    const result = await apiFetchJson<{
+      mistakes: MistakeEntry[];
+      total: number;
+      hasMore: boolean;
+      page: number;
+    }>(`/api/mistakes?${params.toString()}`);
+    setListLoading(false);
+    if (!result.ok) {
+      showActionNotice(result.error ?? "Failed to load mistakes.");
+      return;
+    }
+    setMistakes(Array.isArray(result.data.mistakes) ? result.data.mistakes : []);
+    setTotal(typeof result.data.total === "number" ? result.data.total : 0);
+    setHasMore(Boolean(result.data.hasMore));
+    setPage(typeof result.data.page === "number" ? result.data.page : nextPage);
+    setSelectedIds([]);
+    setDetailId(null);
+  }
+
+  useEffect(() => {
+    if (!ready) return;
+    void loadList(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, sortBy, tagMatchMode, pageSize]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const h = setTimeout(() => {
+      void loadList(1);
+    }, 250);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, search, filterTags]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -89,6 +141,70 @@ export default function LibraryPage() {
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
     );
   };
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allVisibleSelected = filtered.length > 0 && filtered.every((m) => selectedSet.has(m.id));
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleSelectVisible() {
+    if (allVisibleSelected) {
+      const visible = new Set(filtered.map((m) => m.id));
+      setSelectedIds((prev) => prev.filter((id) => !visible.has(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...filtered.map((m) => m.id)])]);
+  }
+
+  async function runBulk(action: "add_tags" | "remove_tags" | "delete" | "export") {
+    if (selectedIds.length === 0) return;
+    const tags = bulkTagInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if ((action === "add_tags" || action === "remove_tags") && tags.length === 0) {
+      showActionNotice("请输入标签（逗号分隔）。");
+      return;
+    }
+    if (action === "delete" && !confirm(`Delete ${selectedIds.length} selected mistakes?`)) {
+      return;
+    }
+    setBulkBusy(true);
+    const result = await apiFetchJson<{
+      affected?: number;
+      deletedIds?: string[];
+      count?: number;
+      mistakes?: MistakeEntry[];
+      exportedAt?: string;
+    }>("/api/mistakes/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ids: selectedIds, tags }),
+    });
+    setBulkBusy(false);
+    if (!result.ok) {
+      showActionNotice(result.error ?? "Bulk action failed.");
+      return;
+    }
+    if (action === "export") {
+      const payload = {
+        exportedAt: result.data.exportedAt ?? new Date().toISOString(),
+        count: result.data.count ?? result.data.mistakes?.length ?? 0,
+        mistakes: result.data.mistakes ?? [],
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `mistakes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      return;
+    }
+    setBulkTagInput("");
+    await loadList(page);
+  }
 
   const detail = detailId ? mistakes.find((m) => m.id === detailId) : null;
 
@@ -138,7 +254,7 @@ export default function LibraryPage() {
     setEditSaving(false);
     if (!result.ok) {
       if (result.conflict) {
-        await refetchMistakes();
+        await loadList(page);
         setEditing(false);
         showConflictNotice(
           "This mistake was updated elsewhere. Latest content has been reloaded. Please review and edit again.",
@@ -150,6 +266,7 @@ export default function LibraryPage() {
     }
     setEditing(false);
     clearConflictNotice();
+    await loadList(page);
   }
 
   function toggleEditPreset(t: string) {
@@ -186,7 +303,7 @@ export default function LibraryPage() {
     setReplaceImageSaving(false);
     if (!result.ok) {
       if (result.conflict) {
-        await refetchMistakes();
+        await loadList(page);
         showConflictNotice(
           "This mistake was updated elsewhere. Latest content has been reloaded. Try replacing the image again.",
         );
@@ -196,6 +313,7 @@ export default function LibraryPage() {
       return;
     }
     clearConflictNotice();
+    await loadList(page);
   }
 
   if (!ready) {
@@ -216,7 +334,7 @@ export default function LibraryPage() {
           actions={[
             {
               label: loading ? "Retrying…" : "Retry",
-              onClick: () => void refetchMistakes(),
+              onClick: () => void loadList(page),
               disabled: loading,
             },
           ]}
@@ -258,6 +376,23 @@ export default function LibraryPage() {
 
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Filter & search</h2>
+        <label className="mb-3 block text-xs font-bold text-[var(--duo-text-muted)]">
+          Sort
+          <select
+            value={sortBy}
+            onChange={(e) =>
+              setSortBy(
+                e.target.value as "latest" | "most_wrong" | "recently_edited" | "recently_reviewed",
+              )
+            }
+            className="mt-1 w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold text-[var(--duo-text)]"
+          >
+            <option value="latest">Latest</option>
+            <option value="most_wrong">Most Wrong</option>
+            <option value="recently_edited">Recently Edited</option>
+            <option value="recently_reviewed">Recently Reviewed</option>
+          </select>
+        </label>
         <input
           type="search"
           value={search}
@@ -315,6 +450,7 @@ export default function LibraryPage() {
               setFilterTags([]);
               setSearch("");
               setTagMatchMode("any");
+              void loadList(1);
             }}
           >
             Clear all filters
@@ -322,10 +458,70 @@ export default function LibraryPage() {
         )}
       </section>
 
-      <p className="mb-3 text-sm font-bold text-[var(--duo-text-muted)]">
-        {filtered.length} shown
-        {mistakes.length !== filtered.length && ` (${mistakes.length} total)`}
-      </p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-sm font-bold text-[var(--duo-text-muted)]">
+          {filtered.length} shown · {total} total
+          {listLoading && " · loading..."}
+        </p>
+        <button
+          type="button"
+          className="text-xs font-bold text-[var(--duo-blue)] underline"
+          onClick={toggleSelectVisible}
+        >
+          {allVisibleSelected ? "Unselect visible" : "Select visible"}
+        </button>
+      </div>
+
+      {selectedIds.length > 0 && (
+        <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+          <p className="mb-2 text-sm font-extrabold text-[var(--duo-text)]">
+            已选择 {selectedIds.length} 条
+          </p>
+          <div className="mb-2 flex gap-2">
+            <input
+              type="text"
+              value={bulkTagInput}
+              onChange={(e) => setBulkTagInput(e.target.value)}
+              placeholder="标签（逗号分隔）"
+              className="min-w-0 flex-1 rounded-xl border-2 border-[var(--duo-border)] px-3 py-2 text-sm font-medium outline-none"
+            />
+            <button
+              type="button"
+              disabled={bulkBusy}
+              className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-xs font-bold"
+              onClick={() => void runBulk("add_tags")}
+            >
+              批量加标签
+            </button>
+            <button
+              type="button"
+              disabled={bulkBusy}
+              className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-xs font-bold"
+              onClick={() => void runBulk("remove_tags")}
+            >
+              批量移除标签
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={bulkBusy}
+              className="flex-1 rounded-xl border-2 border-[#d94848] bg-[#ffe8e8] py-2 text-xs font-bold text-[#c00]"
+              onClick={() => void runBulk("delete")}
+            >
+              批量删除
+            </button>
+            <button
+              type="button"
+              disabled={bulkBusy}
+              className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2 text-xs font-bold"
+              onClick={() => void runBulk("export")}
+            >
+              批量导出
+            </button>
+          </div>
+        </section>
+      )}
 
       <ul className="space-y-4">
         {filtered.map((m) => (
@@ -333,6 +529,17 @@ export default function LibraryPage() {
             key={m.id}
             className="overflow-hidden rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
           >
+            <div className="border-b-2 border-[var(--duo-border)] px-3 py-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-[var(--duo-text-muted)]">
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(m.id)}
+                  onChange={() => toggleSelect(m.id)}
+                  className="accent-[var(--duo-blue)]"
+                />
+                Select
+              </label>
+            </div>
             <button
               type="button"
               className="block w-full text-left"
@@ -374,7 +581,9 @@ export default function LibraryPage() {
                     const r = await removeMistake(m.id);
                     if (!r.ok) {
                       showActionNotice(r.error ?? "Delete failed.");
+                      return;
                     }
+                    await loadList(page);
                   })();
                 }}
               >
@@ -391,6 +600,26 @@ export default function LibraryPage() {
           </li>
         ))}
       </ul>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={page <= 1 || listLoading}
+          className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold disabled:opacity-50"
+          onClick={() => void loadList(page - 1)}
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          disabled={!hasMore || listLoading}
+          className="rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold disabled:opacity-50"
+          onClick={() => void loadList(page + 1)}
+        >
+          Next
+        </button>
+        <span className="text-xs font-bold text-[var(--duo-text-muted)]">Page {page}</span>
+      </div>
 
       {filtered.length === 0 && !loadError && (
         <div className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-12 text-center">
