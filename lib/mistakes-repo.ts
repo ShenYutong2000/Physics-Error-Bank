@@ -1,4 +1,4 @@
-import type { MistakeEntry } from "@/lib/types";
+import { PRESET_TAG_SET, type MistakeEntry } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
@@ -42,7 +42,12 @@ export function rowToEntry(
 }
 
 function normalizeTagNames(tagNames: string[]): string[] {
-  return [...new Set(tagNames.map((t) => t.trim()).filter(Boolean))];
+  const names = [...new Set(tagNames.map((t) => t.trim()).filter(Boolean))];
+  const invalid = names.filter((name) => !PRESET_TAG_SET.has(name));
+  if (invalid.length > 0) {
+    throw new Error("Only preset A-E tags are allowed.");
+  }
+  return names;
 }
 
 async function assignTagsToMistake(
@@ -450,91 +455,4 @@ export async function exportMistakesByIdsForUser(
     include: { mistakeTags: { include: { tag: true } } },
   });
   return rows.map(rowToEntry);
-}
-
-export type TagUsageRow = {
-  name: string;
-  count: number;
-};
-
-export async function listTagUsageForUser(userId: string): Promise<TagUsageRow[]> {
-  const tags = await prisma.tag.findMany({
-    where: { userId },
-    include: { _count: { select: { mistakeTags: true } } },
-    orderBy: [{ mistakeTags: { _count: "desc" } }, { name: "asc" }],
-  });
-  return tags.map((t) => ({ name: t.name, count: t._count.mistakeTags }));
-}
-
-export async function renameOrMergeTagForUser(
-  userId: string,
-  fromNameRaw: string,
-  toNameRaw: string,
-): Promise<{ kind: "ok"; movedCount: number } | { kind: "not_found" }> {
-  const fromName = fromNameRaw.trim();
-  const toName = toNameRaw.trim();
-  if (!fromName || !toName) {
-    throw new Error("Both fromName and toName are required.");
-  }
-  if (fromName === toName) {
-    return { kind: "ok", movedCount: 0 };
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    const fromTag = await tx.tag.findFirst({
-      where: { userId, name: fromName },
-      include: { mistakeTags: { select: { mistakeId: true } } },
-    });
-    if (!fromTag) return { kind: "not_found" as const };
-
-    let toTag = await tx.tag.findFirst({
-      where: { userId, name: toName },
-      select: { id: true },
-    });
-    if (!toTag) {
-      toTag = await tx.tag.create({
-        data: { userId, name: toName },
-        select: { id: true },
-      });
-    }
-
-    const movedCount = fromTag.mistakeTags.length;
-    if (movedCount > 0) {
-      await tx.mistakeTag.createMany({
-        data: fromTag.mistakeTags.map((mt) => ({
-          mistakeId: mt.mistakeId,
-          tagId: toTag.id,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    await tx.mistakeTag.deleteMany({ where: { tagId: fromTag.id } });
-    await tx.tag.delete({ where: { id: fromTag.id } });
-    return { kind: "ok" as const, movedCount };
-  });
-
-  return result;
-}
-
-export async function deleteTagForUser(
-  userId: string,
-  nameRaw: string,
-): Promise<{ kind: "ok"; detachedCount: number } | { kind: "not_found" }> {
-  const name = nameRaw.trim();
-  if (!name) {
-    throw new Error("Tag name is required.");
-  }
-  const result = await prisma.$transaction(async (tx) => {
-    const tag = await tx.tag.findFirst({
-      where: { userId, name },
-      include: { _count: { select: { mistakeTags: true } } },
-    });
-    if (!tag) return { kind: "not_found" as const };
-    const detachedCount = tag._count.mistakeTags;
-    await tx.mistakeTag.deleteMany({ where: { tagId: tag.id } });
-    await tx.tag.delete({ where: { id: tag.id } });
-    return { kind: "ok" as const, detachedCount };
-  });
-  return result;
 }

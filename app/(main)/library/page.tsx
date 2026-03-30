@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
@@ -40,7 +39,6 @@ export default function LibraryPage() {
   const [editing, setEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
-  const [editCustomTag, setEditCustomTag] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const replaceImageInputRef = useRef<HTMLInputElement>(null);
@@ -109,13 +107,6 @@ export default function LibraryPage() {
     PRESET_TAGS.forEach((t) => set.add(t));
     return Array.from(set).sort((a, b) => a.localeCompare(b, "en"));
   }, [mistakes]);
-  const editSuggestedTags = useMemo(() => {
-    const q = editCustomTag.trim().toLowerCase();
-    const pool = allTags.filter((t) => !editTags.includes(t));
-    if (!q) return pool.slice(0, 6);
-    return pool.filter((t) => t.toLowerCase().includes(q)).slice(0, 6);
-  }, [allTags, editCustomTag, editTags]);
-
   const tagCounts = useMemo(() => {
     const map = new Map<string, number>();
     mistakes.forEach((m) => {
@@ -280,7 +271,6 @@ export default function LibraryPage() {
     setEditError(null);
     setReplaceImageError(null);
     clearAllNotices();
-    setEditCustomTag("");
     setEditNotes(m.notes);
     setEditTags([...m.tags]);
   }
@@ -289,7 +279,6 @@ export default function LibraryPage() {
     if (!detail) return;
     setEditNotes(detail.notes);
     setEditTags([...detail.tags]);
-    setEditCustomTag("");
     setEditError(null);
     clearConflictNotice();
     setEditing(true);
@@ -339,13 +328,6 @@ export default function LibraryPage() {
     setEditTags((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
     );
-  }
-
-  function addEditCustomTag() {
-    const t = editCustomTag.trim();
-    if (!t) return;
-    if (!editTags.includes(t)) setEditTags((prev) => [...prev, t]);
-    setEditCustomTag("");
   }
 
   function closeDetail() {
@@ -414,11 +396,6 @@ export default function LibraryPage() {
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
           Browse and filter by tags—see which categories show up most often. In details you can edit
           notes and tags, or replace the problem image with a clearer photo.
-        </p>
-        <p className="mt-2 text-xs font-bold text-[var(--duo-blue)]">
-          <Link href="/tags" className="underline">
-            Open tag management
-          </Link>
         </p>
       </header>
       {actionNotice && (
@@ -891,48 +868,6 @@ export default function LibraryPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        list="library-known-tags"
-                        type="text"
-                        value={editCustomTag}
-                        onChange={(e) => setEditCustomTag(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && (e.preventDefault(), addEditCustomTag())
-                        }
-                        placeholder="Custom tag"
-                        className="min-w-0 flex-1 rounded-xl border-2 border-[var(--duo-border)] px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-green)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={addEditCustomTag}
-                        className="shrink-0 rounded-xl border-b-4 border-[#1d9cdb] bg-[var(--duo-blue)] px-3 py-2 text-sm font-bold text-white active:translate-y-0.5 active:border-b-2"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <datalist id="library-known-tags">
-                      {allTags.map((t) => (
-                        <option key={t} value={t} />
-                      ))}
-                    </datalist>
-                    {editSuggestedTags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {editSuggestedTags.map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => {
-                              if (!editTags.includes(t)) setEditTags((prev) => [...prev, t]);
-                              setEditCustomTag("");
-                            }}
-                            className="rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-1 text-xs font-bold text-[var(--duo-text)]"
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                   <div>
                     <h3 className="mb-2 text-sm font-bold text-[var(--duo-text)]">Solution & notes</h3>
