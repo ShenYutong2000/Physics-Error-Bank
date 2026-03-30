@@ -17,6 +17,6 @@ export function isStudentSchoolEmail(email: string): boolean {
 }
 
 export const STUDENT_EMAIL_REQUIRED_MESSAGE =
-  `Please use your school email address ending with ${STUDENT_EMAIL_DOMAIN}.`;
+  `Please use your school email (${STUDENT_EMAIL_DOMAIN}) or a teacher email on the allowlist.`;
 
 export const MIN_PASSWORD_LENGTH = 8;

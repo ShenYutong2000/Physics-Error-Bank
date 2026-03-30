@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const items = [
+const baseItems = [
   { href: "/add", label: "Add", icon: CameraIcon },
   { href: "/library", label: "Library", icon: BooksIcon },
+  { href: "/papers", label: "Papers", icon: ClipboardIcon },
 ] as const;
 
-export function DuoNav() {
+export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
   const pathname = usePathname();
+  const items = isTeacher
+    ? [...baseItems, { href: "/teacher", label: "Teacher", icon: ChartIcon }]
+    : baseItems;
 
   return (
     <nav
@@ -62,6 +66,27 @@ function BooksIcon({ className }: { className?: string }) {
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       <path d="M8 7h8M8 11h6" />
+    </svg>
+  );
+}
+
+function ClipboardIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+      <path d="M8 12h8M8 16h5" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="6" />
+      <rect x="12" y="9" width="3" height="9" />
+      <rect x="17" y="6" width="3" height="12" />
     </svg>
   );
 }

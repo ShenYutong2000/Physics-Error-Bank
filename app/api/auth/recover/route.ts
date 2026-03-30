@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getExpectedCredentials } from "@/lib/auth-config";
 import {
-  isStudentSchoolEmail,
   normalizeEmail,
   STUDENT_EMAIL_REQUIRED_MESSAGE,
 } from "@/lib/auth-validation";
 import { isDatabaseConfigured } from "@/lib/db";
 import { recoverAccountWithAnswers } from "@/lib/users-repo";
+import { isTeacherEmail } from "@/lib/teacher-role";
 
 export const runtime = "nodejs";
 
@@ -37,7 +37,8 @@ export async function POST(request: Request) {
 
   const creds = getExpectedCredentials();
   const emailAllowed =
-    isStudentSchoolEmail(email) ||
+    email.endsWith("@uwcchina.org") ||
+    (await isTeacherEmail(email)) ||
     (creds !== null && normalizeEmail(email) === normalizeEmail(creds.email));
 
   if (!emailAllowed) {

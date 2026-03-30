@@ -2,9 +2,9 @@ import { prisma, isDatabaseConfigured } from "@/lib/db";
 import { normalizeEmail } from "@/lib/auth-validation";
 import { getAuthSecret, getExpectedCredentials } from "@/lib/auth-config";
 import { sessionCookieName, verifySession } from "@/lib/session";
-import { ensureBootstrapUserInPrisma } from "@/lib/users-repo";
+import { ensureBootstrapUserInPrisma, syncUserRoleByEmail } from "@/lib/users-repo";
 
-export type SessionUser = { email: string; id: string };
+export type SessionUser = { email: string; id: string; role: "STUDENT" | "TEACHER"; name: string };
 
 /**
  * Session cookie proves login, but mistake APIs need a `users` row (UUID).
@@ -57,12 +57,13 @@ export async function getSessionUserFromRequest(
   const norm = normalizeEmail(session.email);
   try {
     await ensurePrismaUserForSessionEmail(norm);
+    await syncUserRoleByEmail(norm);
     const user = await prisma.user.findFirst({
       where: { email: { equals: norm, mode: "insensitive" } },
-      select: { id: true, email: true },
+      select: { id: true, email: true, role: true, name: true },
     });
     if (!user) return null;
-    return { id: user.id, email: user.email };
+    return { id: user.id, email: user.email, role: user.role, name: user.name };
   } catch {
     return null;
   }

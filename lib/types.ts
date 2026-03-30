@@ -58,6 +58,10 @@ export const TAG_GROUPS = [
       "E.5 Fusion and Stars",
     ],
   },
+  {
+    theme: "Theme M - Measurement and Data Processing",
+    tags: ["Measurement"],
+  },
 ] as const;
 
 export const PRESET_TAGS = TAG_GROUPS.flatMap((g) => g.tags);

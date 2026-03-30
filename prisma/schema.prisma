@@ -11,6 +11,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  STUDENT
+  TEACHER
+}
+
+enum PaperSession {
+  MAY
+  NOV
+}
+
+enum ChoiceOption {
+  A
+  B
+  C
+  D
+  BLANK
+}
+
 /// Registered student accounts (source of truth for auth).
 model User {
   id                    String    @id @default(uuid()) @db.Uuid
@@ -20,11 +38,24 @@ model User {
   recoveryAnswer1Hash   String?   @map("recovery_answer_1_hash")
   recoveryAnswer2Hash   String?   @map("recovery_answer_2_hash")
   recoveryAnswer3Hash   String?   @map("recovery_answer_3_hash")
+  name                  String    @default("") @db.VarChar(80)
+  role                  UserRole  @default(STUDENT)
   createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
   mistakes              Mistake[]
   tags                  Tag[]
+  paperAttempts         PaperAttempt[]
+  papersCreated         Paper[]   @relation("PaperCreator")
 
   @@map("users")
+}
+
+model TeacherEmailAllowlist {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique @db.VarChar(320)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("teacher_email_allowlist")
 }
 
 /// One saved mistake per user. Store the image in object storage; `imageKey` is the bucket key (or public URL path).
@@ -64,4 +95,73 @@ model MistakeTag {
   @@id([mistakeId, tagId])
   @@index([tagId])
   @@map("mistake_tags")
+}
+
+model Paper {
+  id            String        @id @default(uuid()) @db.Uuid
+  title         String        @db.VarChar(160)
+  year          Int
+  session       PaperSession
+  questionCount Int           @default(30) @map("question_count")
+  publishedAt   DateTime?     @map("published_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdById   String        @map("created_by_id") @db.Uuid
+  createdBy     User          @relation("PaperCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  questions     PaperQuestion[]
+  attempts      PaperAttempt[]
+
+  @@unique([year, session])
+  @@index([publishedAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("papers")
+}
+
+model PaperQuestion {
+  id            String       @id @default(uuid()) @db.Uuid
+  paperId       String       @map("paper_id") @db.Uuid
+  number        Int
+  correctAnswer ChoiceOption @map("correct_answer")
+  /// IB syllabus theme (Theme A–E or Theme M), not sub-topic tags.
+  theme         String       @default("") @db.VarChar(200)
+  paper         Paper        @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([paperId, number])
+  @@index([paperId])
+  @@map("paper_questions")
+}
+
+model PaperAttempt {
+  id           String               @id @default(uuid()) @db.Uuid
+  paperId      String               @map("paper_id") @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  submittedAt  DateTime             @default(now()) @map("submitted_at")
+  correctCount Int                  @default(0) @map("correct_count")
+  wrongCount   Int                  @default(0) @map("wrong_count")
+  accuracy     Decimal              @default(0) @db.Decimal(5, 2)
+  isLatest     Boolean              @default(true) @map("is_latest")
+  paper        Paper                @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers      PaperAttemptAnswer[]
+
+  @@index([paperId, userId, submittedAt(sort: Desc)])
+  @@index([paperId, isLatest])
+  @@index([userId, submittedAt(sort: Desc)])
+  @@map("paper_attempts")
+}
+
+model PaperAttemptAnswer {
+  id             String       @id @default(uuid()) @db.Uuid
+  attemptId      String       @map("attempt_id") @db.Uuid
+  questionNumber Int          @map("question_number")
+  studentAnswer  ChoiceOption @map("student_answer")
+  correctAnswer  ChoiceOption @map("correct_answer")
+  isCorrect      Boolean      @map("is_correct")
+  themeSnapshot  String       @default("") @map("theme_snapshot") @db.VarChar(200)
+  attempt        PaperAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionNumber])
+  @@index([attemptId])
+  @@index([isCorrect])
+  @@map("paper_attempt_answers")
 }

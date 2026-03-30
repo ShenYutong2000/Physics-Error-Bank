@@ -7,9 +7,51 @@ import {
   normalizeRecoveryAnswer,
   validateRecoveryAnswersForSignup,
 } from "@/lib/recovery-questions";
+import { getRoleForEmail, type UserRoleName } from "@/lib/teacher-role";
+
+/** Matches `users` table after migrations (`name`, `role`, …). */
+type UserAuthRow = {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRoleName;
+  passwordHash: string;
+  createdAt: Date;
+};
+
+type UserBootstrapRow = UserAuthRow & {
+  recoveryAnswer1Hash: string | null;
+  recoveryAnswer2Hash: string | null;
+  recoveryAnswer3Hash: string | null;
+};
+
+/** Cast: some IDE caches may lag behind `prisma generate` and omit new columns on `UserSelect`. */
+const selectUserForAuth = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  passwordHash: true,
+  createdAt: true,
+} as const satisfies Record<string, boolean>;
+
+const selectUserForBootstrap = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  passwordHash: true,
+  recoveryAnswer1Hash: true,
+  recoveryAnswer2Hash: true,
+  recoveryAnswer3Hash: true,
+  createdAt: true,
+} as const satisfies Record<string, boolean>;
 
 export type StoredUser = {
+  id: string;
   email: string;
+  name: string;
+  role: UserRoleName;
   passwordHash: string;
   createdAt: string;
 };
@@ -21,15 +63,36 @@ function isUniqueViolation(e: unknown): e is Prisma.PrismaClientKnownRequestErro
 export async function findUserByEmail(email: string): Promise<StoredUser | null> {
   if (!isDatabaseConfigured()) return null;
   const norm = normalizeEmail(email);
-  const row = await prisma.user.findFirst({
+  const row = (await prisma.user.findFirst({
     where: { email: { equals: norm, mode: "insensitive" } },
-  });
+    select: selectUserForAuth as Prisma.UserSelect,
+  })) as UserAuthRow | null;
   if (!row) return null;
+  return mapUserAuthRow(row);
+}
+
+function mapUserAuthRow(row: UserAuthRow): StoredUser {
   return {
+    id: row.id,
     email: normalizeEmail(row.email),
+    name: row.name,
+    role: row.role,
     passwordHash: row.passwordHash,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+async function syncBootstrapUserIfNeeded(existing: UserBootstrapRow, normEmail: string): Promise<void> {
+  const role = await getRoleForEmail(normEmail);
+  if (existing.role !== role || !existing.name.trim()) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        role,
+        name: existing.name.trim() ? existing.name : normEmail.split("@")[0],
+      } as Prisma.UserUpdateInput,
+    });
+  }
 }
 
 function generateOneTimeLoginPassword(): string {
@@ -38,6 +101,7 @@ function generateOneTimeLoginPassword(): string {
 
 export async function createRegisteredUser(
   email: string,
+  name: string,
   plainPassword: string,
   recoveryAnswers: [string, string, string],
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -49,6 +113,10 @@ export async function createRegisteredUser(
     return { ok: false, error: recoveryErr };
   }
   const norm = normalizeEmail(email);
+  const normalizedName = name.trim();
+  if (!normalizedName) {
+    return { ok: false, error: "Name is required." };
+  }
   const existing = await findUserByEmail(norm);
   if (existing) {
     return { ok: false, error: "An account with this email already exists." };
@@ -57,15 +125,18 @@ export async function createRegisteredUser(
   const recoveryAnswer1Hash = hashPassword(normalizeRecoveryAnswer(recoveryAnswers[0]));
   const recoveryAnswer2Hash = hashPassword(normalizeRecoveryAnswer(recoveryAnswers[1]));
   const recoveryAnswer3Hash = hashPassword(normalizeRecoveryAnswer(recoveryAnswers[2]));
+  const role = await getRoleForEmail(norm);
   try {
     await prisma.user.create({
       data: {
         email: norm,
+        name: normalizedName,
+        role,
         passwordHash,
         recoveryAnswer1Hash,
         recoveryAnswer2Hash,
         recoveryAnswer3Hash,
-      },
+      } as Prisma.UserCreateInput,
     });
   } catch (e) {
     if (isUniqueViolation(e)) {
@@ -130,6 +201,20 @@ export async function verifyRegisteredUser(email: string, plainPassword: string)
   return verifyPassword(user.passwordHash, plainPassword);
 }
 
+export async function syncUserRoleByEmail(email: string): Promise<void> {
+  const norm = normalizeEmail(email);
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: norm, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (!existing) return;
+  const role = await getRoleForEmail(norm);
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: { role } as Prisma.UserUpdateInput,
+  });
+}
+
 export async function changePasswordForUser(
   userId: string,
   currentPassword: string,
@@ -176,11 +261,34 @@ export async function ensureBootstrapUserInPrisma(
 ): Promise<void> {
   if (!isDatabaseConfigured()) return;
   const norm = normalizeEmail(email);
-  const existing = await prisma.user.findFirst({
+  const existing = (await prisma.user.findFirst({
     where: { email: { equals: norm, mode: "insensitive" } },
-  });
-  if (existing) return;
+    select: selectUserForBootstrap as Prisma.UserSelect,
+  })) as UserBootstrapRow | null;
+  if (existing) {
+    await syncBootstrapUserIfNeeded(existing, norm);
+    return;
+  }
+  const role = await getRoleForEmail(norm);
   await prisma.user.create({
-    data: { email: norm, passwordHash: hashPassword(plainPassword) },
+    data: {
+      email: norm,
+      name: norm.split("@")[0],
+      role,
+      passwordHash: hashPassword(plainPassword),
+    } as Prisma.UserCreateInput,
   });
+}
+
+export async function updateUserName(
+  userId: string,
+  name: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const normalizedName = name.trim();
+  if (!normalizedName) return { ok: false, error: "Name is required." };
+  await prisma.user.update({
+    where: { id: userId },
+    data: { name: normalizedName } as Prisma.UserUpdateInput,
+  });
+  return { ok: true };
 }
