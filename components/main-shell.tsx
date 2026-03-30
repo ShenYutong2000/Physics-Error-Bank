@@ -86,7 +86,7 @@ export function MainShell({ email, name, role, children }: Props) {
           </div>
         </div>
       </header>
-      {!profileName.trim() && (
+      {role === "STUDENT" && !profileName.trim() && (
         <div className="mx-auto mt-3 w-full max-w-lg px-4">
           <div className="rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] p-3">
             <p className="text-sm font-bold text-[#a65b00]">Please set your display name for teacher analytics.</p>
