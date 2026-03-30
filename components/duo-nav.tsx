@@ -3,31 +3,54 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const baseItems = [
+const studentItems = [
   { href: "/add", label: "Add", icon: CameraIcon },
   { href: "/library", label: "Library", icon: BooksIcon },
   { href: "/papers", label: "Papers", icon: ClipboardIcon },
 ] as const;
 
+const teacherItems = [
+  { href: "/papers", label: "Papers", icon: ClipboardIcon },
+  { href: "/teacher", label: "Teacher", icon: ChartIcon },
+  { href: "/teacher/mistakes", label: "Class", icon: UsersIcon },
+] as const;
+
+function isTeacherPapersActive(pathname: string): boolean {
+  return pathname === "/papers" || pathname.startsWith("/papers/");
+}
+
+function isTeacherClassActive(pathname: string): boolean {
+  return pathname === "/teacher/mistakes" || pathname.startsWith("/teacher/mistakes/");
+}
+
+function isTeacherBankActive(pathname: string): boolean {
+  if (isTeacherClassActive(pathname)) return false;
+  return pathname === "/teacher" || pathname.startsWith("/teacher/");
+}
+
 export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
   const pathname = usePathname();
-  const items = isTeacher
-    ? [...baseItems, { href: "/teacher", label: "Teacher", icon: ChartIcon }]
-    : baseItems;
+  const items = isTeacher ? teacherItems : studentItems;
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_0_rgba(0,0,0,0.06)]"
       aria-label="Main navigation"
     >
-      <div className="mx-auto flex max-w-lg justify-around px-4">
+      <div className="mx-auto flex max-w-lg justify-around px-2">
         {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = isTeacher
+            ? href === "/papers"
+              ? isTeacherPapersActive(pathname)
+              : href === "/teacher/mistakes"
+                ? isTeacherClassActive(pathname)
+                : isTeacherBankActive(pathname)
+            : pathname === href || (href !== "/add" && href !== "/library" && pathname.startsWith(`${href}/`));
           return (
             <Link
               key={href}
               href={href}
-              className={`flex min-w-[5rem] flex-col items-center gap-1 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+              className={`flex min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
                 active
                   ? "text-[var(--duo-green-dark)]"
                   : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
@@ -87,6 +110,17 @@ function ChartIcon({ className }: { className?: string }) {
       <rect x="7" y="12" width="3" height="6" />
       <rect x="12" y="9" width="3" height="9" />
       <rect x="17" y="6" width="3" height="12" />
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

@@ -60,6 +60,12 @@ export default function TeacherHomePage() {
       <header className="mb-5">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
         <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Shared paper bank</h1>
+        <Link
+          href="/teacher/mistakes"
+          className="mt-3 inline-flex items-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
+        >
+          Class mistake analytics →
+        </Link>
       </header>
       {error && (
         <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
