@@ -1,0 +1,179 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { apiFetchJson } from "@/lib/api-client";
+import { TagStatsChart } from "@/components/tag-stats-chart";
+import type { ChoiceOption, PaperSummary, TagCountRow } from "@/lib/paper-types";
+
+type WrongQuestion = {
+  questionNumber: number;
+  studentAnswer: ChoiceOption;
+  correctAnswer: ChoiceOption;
+  theme: string;
+};
+
+const CHOICES: ChoiceOption[] = ["A", "B", "C", "D", "BLANK"];
+
+export default function PaperAttemptPage() {
+  const params = useParams<{ id: string }>();
+  const paperId = String(params.id ?? "");
+  const [paper, setPaper] = useState<PaperSummary | null>(null);
+  const [questions, setQuestions] = useState<Array<{ number: number }>>([]);
+  const [answers, setAnswers] = useState<Record<number, ChoiceOption>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{
+    attemptId: string;
+    correctCount: number;
+    wrongCount: number;
+    accuracy: number;
+    wrongQuestions: WrongQuestion[];
+    wrongTagCounts: TagCountRow[];
+  } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      const r = await apiFetchJson<{ paper: PaperSummary; questions: Array<{ number: number }> }>(
+        `/api/papers/${encodeURIComponent(paperId)}`,
+      );
+      setLoading(false);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setPaper(r.data.paper);
+      setQuestions(r.data.questions ?? []);
+      setAnswers(Object.fromEntries((r.data.questions ?? []).map((q) => [q.number, "BLANK"])));
+    })();
+  }, [paperId]);
+
+  const answeredCount = useMemo(
+    () => Object.values(answers).filter((v) => v !== "BLANK").length,
+    [answers],
+  );
+
+  async function submit() {
+    setSubmitting(true);
+    setError(null);
+    const payload = {
+      answers: questions.map((q) => ({
+        questionNumber: q.number,
+        answer: answers[q.number] ?? "BLANK",
+      })),
+    };
+    const r = await apiFetchJson<{
+      attemptId: string;
+      correctCount: number;
+      wrongCount: number;
+      accuracy: number;
+      wrongQuestions: WrongQuestion[];
+      wrongTagCounts: TagCountRow[];
+    }>(`/api/papers/${encodeURIComponent(paperId)}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSubmitting(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    setResult(r.data);
+  }
+
+  if (loading) {
+    return <div className="mx-auto max-w-lg px-4 pb-28 pt-6 text-sm font-bold text-[var(--duo-text-muted)]">Loading paper...</div>;
+  }
+
+  return (
+    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+      {paper && (
+        <header className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Paper</p>
+          <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">
+            {paper.year} {paper.session}
+          </h1>
+          <p className="text-sm font-bold text-[var(--duo-text-muted)]">
+            {paper.title} · {answeredCount}/{questions.length} answered
+          </p>
+        </header>
+      )}
+      {error && (
+        <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
+          {error}
+        </p>
+      )}
+      <section className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        <div className="space-y-2">
+          {questions.map((q) => (
+            <div key={q.number} className="flex items-center justify-between gap-2 rounded-xl bg-[var(--duo-surface)] p-2">
+              <span className="text-sm font-extrabold text-[var(--duo-text)]">Q{q.number}</span>
+              <select
+                value={answers[q.number] ?? "BLANK"}
+                onChange={(e) =>
+                  setAnswers((prev) => ({ ...prev, [q.number]: e.target.value as ChoiceOption }))
+                }
+                className="rounded-lg border-2 border-[var(--duo-border)] bg-white px-2 py-1 text-sm font-bold"
+              >
+                {CHOICES.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "BLANK" ? "-" : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </section>
+      <button
+        type="button"
+        disabled={submitting}
+        onClick={() => void submit()}
+        className="duo-btn-primary mt-4 w-full py-3 text-base disabled:opacity-60"
+      >
+        {submitting ? "Submitting..." : "Submit answers"}
+      </button>
+
+      {result && (
+        <section className="mt-6 space-y-4">
+          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <p className="text-lg font-extrabold text-[var(--duo-text)]">
+              Score: {result.correctCount}/{result.correctCount + result.wrongCount} ({result.accuracy}%)
+            </p>
+            <p className="text-sm font-bold text-[var(--duo-text-muted)]">
+              Wrong: {result.wrongCount}
+            </p>
+          </div>
+          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Wrong-theme distribution</h2>
+            <TagStatsChart
+              rows={result.wrongTagCounts}
+              emptyMessage="No wrong themes."
+              ariaLabel="Bar chart of wrong answers per syllabus theme"
+            />
+          </div>
+          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Wrong questions</h2>
+            <div className="space-y-2">
+              {result.wrongQuestions.map((w) => (
+                <div key={w.questionNumber} className="rounded-xl bg-[var(--duo-surface)] p-2">
+                  <p className="text-sm font-bold text-[var(--duo-text)]">
+                    Q{w.questionNumber}: Your {w.studentAnswer}, Correct {w.correctAnswer}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">{w.theme || "(No theme)"}</p>
+                </div>
+              ))}
+              {result.wrongQuestions.length === 0 && (
+                <p className="text-sm font-bold text-[var(--duo-green-dark)]">Perfect score. No wrong questions.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+

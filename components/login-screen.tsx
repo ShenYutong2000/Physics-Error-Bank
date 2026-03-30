@@ -19,6 +19,7 @@ type Props = {
 export function LoginScreen({ showDevHint }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,6 +33,7 @@ export function LoginScreen({ showDevHint }: Props) {
     setMode(next);
     setError(null);
     setConfirmPassword("");
+    setName("");
     setRecoveryA1("");
     setRecoveryA2("");
     setRecoveryA3("");
@@ -43,6 +45,11 @@ export function LoginScreen({ showDevHint }: Props) {
 
     if (mode === "register" && password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+
+    if (mode === "register" && !name.trim()) {
+      setError("Please enter your name.");
       return;
     }
 
@@ -67,6 +74,7 @@ export function LoginScreen({ showDevHint }: Props) {
         body: JSON.stringify(
           mode === "register"
             ? {
+                name,
                 email,
                 password,
                 recoveryAnswer1: recoveryA1,
@@ -143,6 +151,26 @@ export function LoginScreen({ showDevHint }: Props) {
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
+              {mode === "register" && (
+                <>
+                  <label
+                    htmlFor="auth-name"
+                    className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                  >
+                    Name
+                  </label>
+                  <input
+                    id="auth-name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="mb-3 w-full rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] px-4 py-3.5 text-base font-bold text-[var(--duo-text)] outline-none ring-[var(--duo-blue)] focus:border-[var(--duo-blue)] focus:ring-2"
+                    placeholder="Your full name"
+                  />
+                </>
+              )}
               <label
                 htmlFor="auth-email"
                 className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"

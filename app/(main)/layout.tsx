@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { MainShell } from "@/components/main-shell";
 import { getAuthSecret } from "@/lib/auth-config";
+import { prisma } from "@/lib/db";
+import { normalizeEmail } from "@/lib/auth-validation";
 import { sessionCookieName, verifySession } from "@/lib/session";
 
 export default async function MainGroupLayout({
@@ -18,6 +20,17 @@ export default async function MainGroupLayout({
   if (!session) {
     redirect("/");
   }
-
-  return <MainShell email={session.email}>{children}</MainShell>;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizeEmail(session.email), mode: "insensitive" } },
+    select: { email: true, role: true, name: true },
+  });
+  return (
+    <MainShell
+      email={user?.email ?? session.email}
+      role={(user?.role ?? "STUDENT") as "STUDENT" | "TEACHER"}
+      name={user?.name ?? ""}
+    >
+      {children}
+    </MainShell>
+  );
 }

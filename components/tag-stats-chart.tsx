@@ -2,11 +2,18 @@
 
 type Row = { tag: string; count: number };
 
-export function TagStatsChart({ rows }: { rows: Row[] }) {
+type Props = {
+  rows: Row[];
+  /** Overrides default library copy when used for papers / themes. */
+  emptyMessage?: string;
+  ariaLabel?: string;
+};
+
+export function TagStatsChart({ rows, emptyMessage, ariaLabel }: Props) {
   if (rows.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-medium text-[var(--duo-text-muted)]">
-        No tagged mistakes yet. Add one under Add!
+        {emptyMessage ?? "No tagged mistakes yet. Add one under Add!"}
       </div>
     );
   }
@@ -14,7 +21,7 @@ export function TagStatsChart({ rows }: { rows: Row[] }) {
   const max = Math.max(...rows.map((r) => r.count), 1);
 
   return (
-    <div className="space-y-3" role="img" aria-label="Bar chart of mistakes per tag">
+    <div className="space-y-3" role="img" aria-label={ariaLabel ?? "Bar chart of mistakes per tag"}>
       {rows.map(({ tag, count }, i) => {
         const pct = Math.round((count / max) * 100);
         const hue = 100 + (i * 37) % 60;

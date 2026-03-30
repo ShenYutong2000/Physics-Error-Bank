@@ -23,3 +23,17 @@ export async function requireDbAndUser(
   }
   return { ok: true, user };
 }
+
+export async function requireTeacher(
+  request: Request,
+): Promise<{ ok: true; user: SessionUser } | { ok: false; response: NextResponse }> {
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard;
+  if (guard.user.role !== "TEACHER") {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Forbidden. Teacher access only." }, { status: 403 }),
+    };
+  }
+  return guard;
+}

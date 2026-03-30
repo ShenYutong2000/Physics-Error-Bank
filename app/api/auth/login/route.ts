@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
 import { getAuthSecret, getExpectedCredentials } from "@/lib/auth-config";
 import {
-  isStudentSchoolEmail,
   normalizeEmail,
   STUDENT_EMAIL_REQUIRED_MESSAGE,
 } from "@/lib/auth-validation";
 import { isDatabaseConfigured } from "@/lib/db";
-import { ensureBootstrapUserInPrisma, verifyRegisteredUser } from "@/lib/users-repo";
+import { ensureBootstrapUserInPrisma, syncUserRoleByEmail, verifyRegisteredUser } from "@/lib/users-repo";
+import { isTeacherEmail } from "@/lib/teacher-role";
 
 export const runtime = "nodejs";
 
@@ -28,7 +28,8 @@ export async function POST(request: Request) {
 
   const creds = getExpectedCredentials();
   const emailAllowed =
-    isStudentSchoolEmail(email) ||
+    email.endsWith("@uwcchina.org") ||
+    (await isTeacherEmail(email)) ||
     (creds !== null && normalizeEmail(email) === normalizeEmail(creds.email));
 
   if (!emailAllowed) {
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
 
   const registeredOk = await verifyRegisteredUser(email, password);
   if (registeredOk) {
+    await syncUserRoleByEmail(email);
     return jsonResponseWithSession(email, secret);
   }
 

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { jsonResponseWithSession } from "@/lib/auth-session-response";
 import { getAuthSecret } from "@/lib/auth-config";
 import {
-  isStudentSchoolEmail,
   isValidEmail,
   MIN_PASSWORD_LENGTH,
   normalizeEmail,
@@ -10,11 +9,13 @@ import {
 } from "@/lib/auth-validation";
 import { isDatabaseConfigured } from "@/lib/db";
 import { createRegisteredUser } from "@/lib/users-repo";
+import { isTeacherEmail } from "@/lib/teacher-role";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   let body: {
+    name?: string;
     email?: string;
     password?: string;
     recoveryAnswer1?: string;
@@ -27,14 +28,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  const name = typeof body.name === "string" ? body.name : "";
   const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
   const password = typeof body.password === "string" ? body.password : "";
   const recoveryAnswer1 = typeof body.recoveryAnswer1 === "string" ? body.recoveryAnswer1 : "";
   const recoveryAnswer2 = typeof body.recoveryAnswer2 === "string" ? body.recoveryAnswer2 : "";
   const recoveryAnswer3 = typeof body.recoveryAnswer3 === "string" ? body.recoveryAnswer3 : "";
 
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  if (!name.trim() || !email || !password) {
+    return NextResponse.json({ error: "Name, email and password are required." }, { status: 400 });
   }
 
   if (!recoveryAnswer1 || !recoveryAnswer2 || !recoveryAnswer3) {
@@ -48,7 +50,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
 
-  if (!isStudentSchoolEmail(email)) {
+  const allowed = email.endsWith("@uwcchina.org") || (await isTeacherEmail(email));
+  if (!allowed) {
     return NextResponse.json({ error: STUDENT_EMAIL_REQUIRED_MESSAGE }, { status: 400 });
   }
 
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const created = await createRegisteredUser(email, password, [
+  const created = await createRegisteredUser(email, name, password, [
     recoveryAnswer1,
     recoveryAnswer2,
     recoveryAnswer3,
