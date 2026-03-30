@@ -5,16 +5,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { compressImageForUpload } from "@/lib/image-compress";
 import { rotateImageFile } from "@/lib/image-edit";
-import { PRESET_TAGS, TAG_GROUPS } from "@/lib/types";
+import { TAG_GROUPS } from "@/lib/types";
 
 export default function AddMistakePage() {
-  const { addMistake, mistakes, ready, saving, loadError } = useMistakes();
+  const { addMistake, ready, saving, loadError } = useMistakes();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
-  const [customTag, setCustomTag] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
@@ -71,29 +70,6 @@ export default function AddMistakePage() {
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
     );
   };
-
-  const addCustomTag = () => {
-    const t = customTag.trim();
-    if (!t) return;
-    if (!tags.includes(t)) setTags((prev) => [...prev, t]);
-    setCustomTag("");
-  };
-
-  const knownTags = Array.from(
-    new Set([
-      ...PRESET_TAGS,
-      ...mistakes.flatMap((m) => m.tags),
-    ]),
-  ).sort((a, b) => a.localeCompare(b, "en"));
-  const suggestedCustomTags = customTag.trim()
-    ? knownTags
-        .filter(
-          (t) =>
-            !tags.includes(t) &&
-            t.toLowerCase().includes(customTag.trim().toLowerCase()),
-        )
-        .slice(0, 6)
-    : knownTags.filter((t) => !tags.includes(t)).slice(0, 6);
 
   const submit = async () => {
     setError(null);
@@ -263,11 +239,6 @@ export default function AddMistakePage() {
 
       <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-3 text-sm font-bold text-[var(--duo-text)]">Tags</h2>
-        <div className="mb-3 flex justify-end">
-          <Link href="/tags" className="text-xs font-bold text-[var(--duo-blue)] underline">
-            Manage tags
-          </Link>
-        </div>
         <div className="space-y-4">
           {TAG_GROUPS.map((group) => (
             <div key={group.theme}>
@@ -296,52 +267,6 @@ export default function AddMistakePage() {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex gap-2">
-          <input
-            list="known-tags"
-            type="text"
-            value={customTag}
-            onChange={(e) => setCustomTag(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomTag())}
-            placeholder="Custom tag"
-            className="min-w-0 flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-medium outline-none focus:border-[var(--duo-green)]"
-          />
-          <button
-            type="button"
-            onClick={addCustomTag}
-            className="shrink-0 rounded-xl border-b-4 border-[#1d9cdb] bg-[var(--duo-blue)] px-4 py-2 text-sm font-bold text-white active:translate-y-0.5 active:border-b-2"
-          >
-            Add
-          </button>
-        </div>
-        <datalist id="known-tags">
-          {knownTags.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-        {suggestedCustomTags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {suggestedCustomTags.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  if (!tags.includes(t)) setTags((prev) => [...prev, t]);
-                  setCustomTag("");
-                }}
-                className="rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-1 text-xs font-bold text-[var(--duo-text)]"
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        )}
-        {tags.filter((t) => !(PRESET_TAGS as readonly string[]).includes(t)).length > 0 && (
-          <p className="mt-2 text-xs font-medium text-[var(--duo-text-muted)]">
-            Custom tags:{" "}
-            {tags.filter((t) => !(PRESET_TAGS as readonly string[]).includes(t)).join(", ")}
-          </p>
-        )}
       </section>
 
       <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">

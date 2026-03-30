@@ -72,6 +72,9 @@ export async function PATCH(request: Request, context: Ctx) {
     if (msg.includes("At least one tag")) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
+    if (msg.includes("Only preset A-E tags are allowed")) {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     console.error(e);
     return NextResponse.json({ error: "Failed to update mistake." }, { status: 500 });
   }

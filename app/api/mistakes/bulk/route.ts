@@ -73,6 +73,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "Bulk operation failed.";
+    if (msg.includes("Only preset A-E tags are allowed")) {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     console.error(e);
     return NextResponse.json({ error: "Bulk operation failed." }, { status: 500 });
   }
