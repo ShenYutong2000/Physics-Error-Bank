@@ -1,14 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { compressImageForUpload } from "@/lib/image-compress";
+import { rotateImageFile } from "@/lib/image-edit";
 import { PRESET_TAGS, TAG_GROUPS } from "@/lib/types";
 
 export default function AddMistakePage() {
-  const router = useRouter();
   const { addMistake, mistakes, ready, saving, loadError } = useMistakes();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
@@ -19,6 +18,13 @@ export default function AddMistakePage() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [rotateTurns, setRotateTurns] = useState(0);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [savePhase, setSavePhase] = useState<
+    "idle" | "compressing" | "uploading" | "finalizing"
+  >("idle");
 
   const clearPreview = useCallback(() => {
     if (previewUrl?.startsWith("blob:")) {
@@ -30,6 +36,7 @@ export default function AddMistakePage() {
 
   const onFile = useCallback((file: File | null) => {
     setError(null);
+    setSaveSuccess(false);
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setError("Please choose an image file.");
@@ -40,7 +47,24 @@ export default function AddMistakePage() {
       return URL.createObjectURL(file);
     });
     selectedFileRef.current = file;
+    setRotateTurns(0);
+    setUploadPercent(null);
+    setSavePhase("idle");
   }, []);
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const items = Array.from(event.clipboardData?.items ?? []);
+      const imageItem = items.find((item) => item.type.startsWith("image/"));
+      if (!imageItem) return;
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      event.preventDefault();
+      onFile(file);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [onFile]);
 
   const togglePreset = (t: string) => {
     setTags((prev) =>
@@ -73,6 +97,7 @@ export default function AddMistakePage() {
 
   const submit = async () => {
     setError(null);
+    setSaveSuccess(false);
     const rawFile = selectedFileRef.current;
     if (!rawFile) {
       setError("Take a photo or upload an image of the problem first.");
@@ -83,9 +108,12 @@ export default function AddMistakePage() {
       return;
     }
     setCompressing(true);
+    setSavePhase("compressing");
+    setUploadPercent(null);
     let file: File = rawFile;
     try {
-      file = await compressImageForUpload(rawFile, {
+      const prepared = rotateTurns === 0 ? rawFile : await rotateImageFile(rawFile, rotateTurns);
+      file = await compressImageForUpload(prepared, {
         maxWidth: 1600,
         maxHeight: 1600,
         quality: 0.82,
@@ -97,16 +125,33 @@ export default function AddMistakePage() {
       setCompressing(false);
     }
 
-    const result = await addMistake({ file, tags, notes: notes.trim() });
+    setSavePhase("uploading");
+    const result = await addMistake(
+      { file, tags, notes: notes.trim() },
+      {
+        onUploadProgress: ({ percent }) => {
+          setUploadPercent(percent);
+          setSavePhase("uploading");
+        },
+      },
+    );
     if (!result.ok) {
       setError(result.error ?? "Could not save.");
+      setSavePhase("idle");
       return;
     }
+    setSavePhase("finalizing");
     clearPreview();
     setTags([]);
     setNotes("");
+    setRotateTurns(0);
+    setUploadPercent(100);
+    setSaveSuccess(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    router.push("/library");
+    setTimeout(() => {
+      setSavePhase("idle");
+      setUploadPercent(null);
+    }, 800);
   };
 
   if (!ready) {
@@ -147,7 +192,27 @@ export default function AddMistakePage() {
           id="mistake-photo"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+        <div
+          className={`rounded-xl border-2 border-dashed p-3 transition-colors ${
+            dragOver
+              ? "border-[var(--duo-blue)] bg-[#eef7ff]"
+              : "border-[var(--duo-border)] bg-[var(--duo-surface)]"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            onFile(e.dataTransfer.files?.[0] ?? null);
+          }}
+        >
+          <p className="mb-3 text-xs font-medium text-[var(--duo-text-muted)]">
+            Drag image here, or paste screenshot with Ctrl+V.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
           <label
             htmlFor="mistake-photo"
             className="duo-btn-primary flex flex-1 cursor-pointer items-center justify-center gap-2 py-4 text-center"
@@ -167,6 +232,7 @@ export default function AddMistakePage() {
               Remove image
             </button>
           )}
+          </div>
         </div>
         {previewUrl && (
           <div className="mt-4 overflow-hidden rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
@@ -175,7 +241,22 @@ export default function AddMistakePage() {
               src={previewUrl}
               alt="Preview of the problem"
               className="max-h-64 w-full object-contain"
+              style={{ transform: `rotate(${rotateTurns * 90}deg)` }}
             />
+          </div>
+        )}
+        {previewUrl && (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setRotateTurns((prev) => (prev + 1) % 4);
+                setSaveSuccess(false);
+              }}
+              className="rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-xs font-bold text-[var(--duo-text)]"
+            >
+              Rotate 90°
+            </button>
           </div>
         )}
       </section>
@@ -279,6 +360,56 @@ export default function AddMistakePage() {
           {error}
         </p>
       )}
+      {saveSuccess && (
+        <div className="mb-4 rounded-xl border-2 border-[#58cc02] bg-[#ebf9de] px-3 py-2 text-sm font-bold text-[#2d7a00]">
+          Saved successfully.
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg border-2 border-[#58cc02] bg-white px-3 py-1 text-xs font-bold text-[#2d7a00]"
+            >
+              Continue adding next
+            </button>
+            <Link
+              href="/library"
+              className="rounded-lg border-2 border-[#9fd97a] bg-[#f7fff1] px-3 py-1 text-xs font-bold text-[#2d7a00]"
+            >
+              View library
+            </Link>
+          </div>
+        </div>
+      )}
+      {(compressing || saving || savePhase !== "idle") && (
+        <div className="mb-3 rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-xs font-bold text-[var(--duo-text)]">
+          <p>
+            {savePhase === "compressing"
+              ? "Optimizing image..."
+              : savePhase === "uploading"
+                ? uploadPercent !== null
+                  ? `Uploading... ${uploadPercent}%`
+                  : "Uploading..."
+                : savePhase === "finalizing"
+                  ? "Finishing save..."
+                  : "Preparing..."}
+          </p>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--duo-surface)]">
+            <div
+              className="h-full bg-[var(--duo-blue)] transition-all"
+              style={{
+                width:
+                  savePhase === "compressing"
+                    ? "28%"
+                    : savePhase === "uploading"
+                      ? `${uploadPercent ?? 65}%`
+                      : savePhase === "finalizing"
+                        ? "100%"
+                        : "12%",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
@@ -286,7 +417,11 @@ export default function AddMistakePage() {
         disabled={saving || compressing}
         className="duo-btn-primary w-full py-4 text-lg disabled:opacity-60"
       >
-        {compressing ? "Optimizing image…" : saving ? "Saving…" : "Save to library"}
+        {compressing
+          ? "Optimizing image..."
+          : saving || savePhase === "uploading" || savePhase === "finalizing"
+            ? "Saving..."
+            : "Save to library"}
       </button>
     </div>
   );

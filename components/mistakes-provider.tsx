@@ -19,9 +19,13 @@ type AddMistakeInput = {
   notes: string;
 };
 
+type AddMistakeOptions = {
+  onUploadProgress?: (progress: { loaded: number; total: number | null; percent: number | null }) => void;
+};
+
 type MistakesContextValue = {
   mistakes: MistakeEntry[];
-  addMistake: (input: AddMistakeInput) => Promise<{ ok: boolean; error?: string }>;
+  addMistake: (input: AddMistakeInput, options?: AddMistakeOptions) => Promise<{ ok: boolean; error?: string }>;
   updateMistake: (
     id: string,
     input: { notes: string; tags: string[]; expectedUpdatedAt: string },
@@ -102,16 +106,51 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
     void refetchMistakes();
   }, [pathname, refetchMistakes]);
 
-  const addMistake = useCallback(async (input: AddMistakeInput) => {
+  const addMistake = useCallback(async (input: AddMistakeInput, options?: AddMistakeOptions) => {
     setSaving(true);
     try {
       const fd = new FormData();
       fd.set("image", input.file);
       fd.set("notes", input.notes);
       fd.set("tags", JSON.stringify(input.tags));
-      const result = await apiFetchJson<{ mistake?: MistakeEntry }>("/api/mistakes", {
-        method: "POST",
-        body: fd,
+      const result = await new Promise<
+        { ok: true; data: { mistake?: MistakeEntry } } | { ok: false; status: number; error: string }
+      >((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/mistakes", true);
+        xhr.withCredentials = true;
+
+        xhr.upload.onprogress = (event) => {
+          if (!options?.onUploadProgress) return;
+          const total = Number.isFinite(event.total) && event.total > 0 ? event.total : null;
+          const percent = total ? Math.min(100, Math.round((event.loaded / total) * 100)) : null;
+          options.onUploadProgress({ loaded: event.loaded, total, percent });
+        };
+
+        xhr.onerror = () => {
+          resolve({ ok: false, status: 0, error: "Network error." });
+        };
+
+        xhr.onload = () => {
+          const raw = xhr.responseText;
+          let body: { error?: string; mistake?: MistakeEntry } = {};
+          try {
+            body = (raw ? JSON.parse(raw) : {}) as { error?: string; mistake?: MistakeEntry };
+          } catch {
+            body = {};
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            resolve({
+              ok: false,
+              status: xhr.status,
+              error: body.error ?? "Could not save mistake.",
+            });
+            return;
+          }
+          resolve({ ok: true, data: body });
+        };
+
+        xhr.send(fd);
       });
       if (!result.ok) {
         return { ok: false as const, error: result.error ?? "Could not save mistake." };
