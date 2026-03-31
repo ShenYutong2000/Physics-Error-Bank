@@ -15,17 +15,19 @@ const teacherItems = [
   { href: "/teacher/mistakes", label: "Class", icon: UsersIcon },
 ] as const;
 
-function isTeacherPapersActive(pathname: string): boolean {
-  return pathname === "/papers" || pathname.startsWith("/papers/");
+function pathMatchesBase(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-function isTeacherClassActive(pathname: string): boolean {
-  return pathname === "/teacher/mistakes" || pathname.startsWith("/teacher/mistakes/");
-}
-
-function isTeacherBankActive(pathname: string): boolean {
-  if (isTeacherClassActive(pathname)) return false;
-  return pathname === "/teacher" || pathname.startsWith("/teacher/");
+function isTeacherNavItemActive(pathname: string, href: string): boolean {
+  if (href === "/papers") return pathMatchesBase(pathname, "/papers");
+  if (href === "/teacher/mistakes") return pathMatchesBase(pathname, "/teacher/mistakes");
+  if (href === "/teacher") {
+    return (
+      pathMatchesBase(pathname, "/teacher") && !pathMatchesBase(pathname, "/teacher/mistakes")
+    );
+  }
+  return false;
 }
 
 export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
@@ -40,11 +42,7 @@ export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
       <div className="mx-auto flex max-w-lg justify-around px-2">
         {items.map(({ href, label, icon: Icon }) => {
           const active = isTeacher
-            ? href === "/papers"
-              ? isTeacherPapersActive(pathname)
-              : href === "/teacher/mistakes"
-                ? isTeacherClassActive(pathname)
-                : isTeacherBankActive(pathname)
+            ? isTeacherNavItemActive(pathname, href)
             : pathname === href || (href !== "/add" && href !== "/library" && pathname.startsWith(`${href}/`));
           return (
             <Link
