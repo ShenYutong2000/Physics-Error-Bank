@@ -10,7 +10,6 @@ const studentItems = [
 ] as const;
 
 const teacherItems = [
-  { href: "/papers", label: "Papers", icon: ClipboardIcon },
   { href: "/teacher", label: "Teacher", icon: ChartIcon },
   { href: "/teacher/mistakes", label: "Class", icon: UsersIcon },
 ] as const;
@@ -20,7 +19,6 @@ function pathMatchesBase(pathname: string, base: string): boolean {
 }
 
 function isTeacherNavItemActive(pathname: string, href: string): boolean {
-  if (href === "/papers") return pathMatchesBase(pathname, "/papers");
   if (href === "/teacher/mistakes") return pathMatchesBase(pathname, "/teacher/mistakes");
   if (href === "/teacher") {
     return (

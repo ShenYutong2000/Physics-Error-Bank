@@ -37,3 +37,21 @@ export async function requireTeacher(
   }
   return guard;
 }
+
+/** Past-paper practice (list, load, submit, attempt detail) is for students only. */
+export async function requireStudent(
+  request: Request,
+): Promise<{ ok: true; user: SessionUser } | { ok: false; response: NextResponse }> {
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) return guard;
+  if (guard.user.role !== "STUDENT") {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Past paper practice is for students only." },
+        { status: 403 },
+      ),
+    };
+  }
+  return guard;
+}

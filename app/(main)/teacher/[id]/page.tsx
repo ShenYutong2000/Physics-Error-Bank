@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import type { ChoiceOption, TagCountRow } from "@/lib/paper-types";
@@ -38,6 +38,7 @@ type AnalyticsResponse = {
 };
 
 export default function TeacherPaperDetailPage() {
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const paperId = String(id ?? "");
   const [mode, setMode] = useState<Mode>("latest");
@@ -45,6 +46,7 @@ export default function TeacherPaperDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingQuestions, setSavingQuestions] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [questionsText, setQuestionsText] = useState("1,A,A\n2,B,B");
 
   async function loadAnalytics(nextMode: Mode) {
@@ -136,6 +138,28 @@ export default function TeacherPaperDetailPage() {
     await loadAnalytics(mode);
   }
 
+  async function deletePaper() {
+    const label = analytics
+      ? `${analytics.paper.year} ${analytics.paper.session} — ${analytics.paper.title}`
+      : "this paper";
+    const extra =
+      analytics?.paper.publishedAt != null
+        ? "\n\nThis will remove the paper from students and permanently delete all submitted attempts for it."
+        : "";
+    if (!window.confirm(`Delete ${label}? This cannot be undone.${extra}`)) return;
+    setDeleteBusy(true);
+    setError(null);
+    const r = await apiFetchJson<{ ok: true }>(`/api/teacher/papers/${encodeURIComponent(paperId)}`, {
+      method: "DELETE",
+    });
+    setDeleteBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    router.push("/teacher");
+  }
+
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
       <header className="mb-4">
@@ -193,6 +217,18 @@ export default function TeacherPaperDetailPage() {
             Unpublish
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => void deletePaper()}
+          disabled={deleteBusy || publishBusy || savingQuestions}
+          className="mt-3 w-full rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] py-2.5 text-xs font-extrabold text-[#c00] disabled:opacity-60"
+        >
+          {deleteBusy ? "Deleting..." : "Delete paper"}
+        </button>
+        <p className="mt-2 text-[11px] font-bold text-[var(--duo-text-muted)]">
+          Deleting removes questions and all student scores for this paper. To fix content without losing data, use
+          Unpublish, edit, then Publish again.
+        </p>
       </section>
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="mb-2 flex items-center justify-between">

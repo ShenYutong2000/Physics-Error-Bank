@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDbAndUser } from "@/lib/api-route-guards";
+import { requireStudent } from "@/lib/api-route-guards";
 import { submitPaperAttempt } from "@/lib/papers-repo";
 import type { ChoiceOption } from "@/lib/paper-types";
 
@@ -19,7 +19,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireDbAndUser(request);
+  const guard = await requireStudent(request);
   if (!guard.ok) return guard.response;
   const { id } = await context.params;
   let body: SubmitBody;
