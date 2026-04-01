@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
@@ -49,34 +49,40 @@ export default function TeacherPaperDetailPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [questionsText, setQuestionsText] = useState("1,A,A\n2,B,B");
 
-  async function loadAnalytics(nextMode: Mode) {
-    const r = await apiFetchJson<AnalyticsResponse>(
-      `/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=${nextMode}`,
-    );
-    if (!r.ok) {
-      setError(r.error);
-      return;
-    }
-    setAnalytics(r.data);
-  }
+  const fetchAnalytics = useCallback(
+    (nextMode: Mode) =>
+      apiFetchJson<AnalyticsResponse>(
+        `/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=${nextMode}`,
+      ),
+    [paperId],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const r = await apiFetchJson<AnalyticsResponse>(
-        `/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=${mode}`,
-      );
+    void (async () => {
+      const r = await fetchAnalytics(mode);
       if (cancelled) return;
       if (!r.ok) {
         setError(r.error);
         return;
       }
+      setError(null);
       setAnalytics(r.data);
     })();
     return () => {
       cancelled = true;
     };
-  }, [paperId, mode]);
+  }, [paperId, mode, fetchAnalytics]);
+
+  async function loadAnalytics(nextMode: Mode) {
+    const r = await fetchAnalytics(nextMode);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    setError(null);
+    setAnalytics(r.data);
+  }
 
   const parsedQuestions = useMemo(() => {
     const lines = questionsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);

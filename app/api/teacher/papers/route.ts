@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/api-route-guards";
+import { DEFAULT_PAPER_QUESTION_COUNT } from "@/lib/paper-types";
 import { createPaper, listPapers } from "@/lib/papers-repo";
 
 export const runtime = "nodejs";
@@ -36,7 +37,9 @@ export async function POST(request: Request) {
   const year = typeof body.year === "number" ? body.year : NaN;
   const session = body.session === "MAY" || body.session === "NOV" ? body.session : "";
   const questionCount =
-    typeof body.questionCount === "number" ? Math.max(1, Math.min(60, Math.floor(body.questionCount))) : 30;
+    typeof body.questionCount === "number"
+      ? Math.max(1, Math.min(60, Math.floor(body.questionCount)))
+      : DEFAULT_PAPER_QUESTION_COUNT;
   if (!title || !Number.isFinite(year) || !session) {
     return NextResponse.json({ error: "title, year and session are required." }, { status: 400 });
   }

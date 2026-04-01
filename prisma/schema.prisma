@@ -102,7 +102,7 @@ model Paper {
   title         String        @db.VarChar(160)
   year          Int
   session       PaperSession
-  questionCount Int           @default(30) @map("question_count")
+  questionCount Int           @default(40) @map("question_count")
   publishedAt   DateTime?     @map("published_at")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
