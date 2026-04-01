@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
-import type { ExamSession, PaperSummary } from "@/lib/paper-types";
+import { DEFAULT_PAPER_QUESTION_COUNT, type ExamSession, type PaperSummary } from "@/lib/paper-types";
 
 export default function TeacherHomePage() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
@@ -13,7 +13,7 @@ export default function TeacherHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function fetchPapers() {
+  async function loadPapers() {
     const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
     if (!r.ok) {
       setError(r.error);
@@ -24,7 +24,7 @@ export default function TeacherHomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
       if (cancelled) return;
       if (!r.ok) {
@@ -44,7 +44,7 @@ export default function TeacherHomePage() {
     const r = await apiFetchJson<{ paper: PaperSummary }>("/api/teacher/papers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, year, session, questionCount: 30 }),
+      body: JSON.stringify({ title, year, session, questionCount: DEFAULT_PAPER_QUESTION_COUNT }),
     });
     setSaving(false);
     if (!r.ok) {
@@ -52,7 +52,7 @@ export default function TeacherHomePage() {
       return;
     }
     setTitle("");
-    await fetchPapers();
+    await loadPapers();
   }
 
   return (

@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStudent } from "@/lib/api-route-guards";
 import { submitPaperAttempt } from "@/lib/papers-repo";
-import type { ChoiceOption } from "@/lib/paper-types";
-
-function toChoiceOption(raw: string): ChoiceOption {
-  const v = raw.trim().toUpperCase();
-  if (v === "A" || v === "B" || v === "C" || v === "D") return v;
-  return "BLANK";
-}
+import { normalizePaperChoice } from "@/lib/paper-types";
 
 export const runtime = "nodejs";
 
@@ -32,7 +26,7 @@ export async function POST(
     ? body.answers
         .map((a) => ({
           questionNumber: typeof a.questionNumber === "number" ? a.questionNumber : NaN,
-          answer: typeof a.answer === "string" ? toChoiceOption(a.answer) : ("BLANK" as const),
+          answer: typeof a.answer === "string" ? normalizePaperChoice(a.answer) : ("BLANK" as const),
         }))
         .filter((a) => Number.isFinite(a.questionNumber) && a.questionNumber > 0)
     : [];

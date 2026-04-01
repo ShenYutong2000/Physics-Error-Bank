@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db";
-import type { ChoiceOption, ExamSession, PaperSummary, TagCountRow } from "@/lib/paper-types";
+import {
+  DEFAULT_PAPER_QUESTION_COUNT,
+  normalizePaperChoice,
+  type ChoiceOption,
+  type ExamSession,
+  type PaperSummary,
+  type TagCountRow,
+} from "@/lib/paper-types";
 import { canonicalizePaperThemeLabel, normalizePaperTheme } from "@/lib/paper-themes";
 
 type PaperQuestionInput = {
@@ -29,12 +36,6 @@ function toPaperSummary(row: {
     questionCount: row.questionCount,
     publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
   };
-}
-
-function normalizeChoice(value: string): ChoiceOption {
-  const v = value.trim().toUpperCase();
-  if (v === "A" || v === "B" || v === "C" || v === "D") return v;
-  return "BLANK";
 }
 
 /** One theme label per wrong answer (Theme A–E or Theme M). */
@@ -115,7 +116,7 @@ export async function upsertPaperQuestions(paperId: string, questions: PaperQues
     }
     await tx.paper.update({
       where: { id: paperId },
-      data: { questionCount: normalized.length || 30 },
+      data: { questionCount: normalized.length || DEFAULT_PAPER_QUESTION_COUNT },
     });
   });
 }
@@ -202,7 +203,7 @@ export async function submitPaperAttempt(input: {
   }
   const answersByNumber = new Map<number, ChoiceOption>();
   input.answers.forEach((a) => {
-    answersByNumber.set(a.questionNumber, normalizeChoice(a.answer));
+    answersByNumber.set(a.questionNumber, normalizePaperChoice(a.answer));
   });
   const judged = paper.questions.map((q) => {
     const studentAnswer = answersByNumber.get(q.number) ?? "BLANK";
