@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import type { ChoiceOption, TagCountRow } from "@/lib/paper-types";
+import type { ChoiceOption, TagMasteryRow } from "@/lib/paper-types";
 import { PAPER_THEME_LABELS } from "@/lib/paper-themes";
 
-type Mode = "latest" | "all";
+type MasterySort = "high_to_low" | "low_to_high";
 
 type AnalyticsResponse = {
   paper: {
@@ -18,22 +18,15 @@ type AnalyticsResponse = {
     questionCount: number;
     publishedAt: string | null;
   };
-  mode: Mode;
   overall: {
     studentCount: number;
-    attemptCount: number;
-    averageAccuracy: number;
-    wrongTagCounts: TagCountRow[];
+    correctTagMastery: TagMasteryRow[];
   };
   students: Array<{
     userId: string;
     name: string;
     email: string;
-    attemptCount: number;
-    latestAttemptId: string | null;
-    latestSubmittedAt: string | null;
-    latestAccuracy: number | null;
-    wrongTagCounts: TagCountRow[];
+    correctTagMastery: TagMasteryRow[];
   }>;
 };
 
@@ -41,45 +34,57 @@ export default function TeacherPaperDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const paperId = String(id ?? "");
-  const [mode, setMode] = useState<Mode>("latest");
+  const [masterySort, setMasterySort] = useState<MasterySort>("high_to_low");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingQuestions, setSavingQuestions] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [questionsText, setQuestionsText] = useState("1,A,A\n2,B,B");
+  const [paperMissing, setPaperMissing] = useState(false);
 
   const fetchAnalytics = useCallback(
-    (nextMode: Mode) =>
-      apiFetchJson<AnalyticsResponse>(
-        `/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=${nextMode}`,
-      ),
+    () => apiFetchJson<AnalyticsResponse>(`/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=latest`),
     [paperId],
   );
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const r = await fetchAnalytics(mode);
+      const r = await fetchAnalytics();
       if (cancelled) return;
       if (!r.ok) {
+        if (r.status === 404) {
+          setPaperMissing(true);
+          setError("Paper not found. Please reopen it from Teacher list.");
+          return;
+        }
+        setPaperMissing(false);
         setError(r.error);
         return;
       }
+      setPaperMissing(false);
       setError(null);
       setAnalytics(r.data);
     })();
     return () => {
       cancelled = true;
     };
-  }, [paperId, mode, fetchAnalytics]);
+  }, [paperId, fetchAnalytics]);
 
-  async function loadAnalytics(nextMode: Mode) {
-    const r = await fetchAnalytics(nextMode);
+  async function loadAnalytics() {
+    const r = await fetchAnalytics();
     if (!r.ok) {
+      if (r.status === 404) {
+        setPaperMissing(true);
+        setError("Paper not found. Please reopen it from Teacher list.");
+        return;
+      }
+      setPaperMissing(false);
       setError(r.error);
       return;
     }
+    setPaperMissing(false);
     setError(null);
     setAnalytics(r.data);
   }
@@ -99,6 +104,17 @@ export default function TeacherPaperDetailPage() {
       };
     });
   }, [questionsText]);
+
+  const sortMasteryRows = useCallback(
+    (rows: TagMasteryRow[]): TagMasteryRow[] =>
+      [...rows].sort((a, b) => {
+        if (masterySort === "high_to_low") {
+          return b.masteryPercent - a.masteryPercent || b.total - a.total || a.tag.localeCompare(b.tag, "en");
+        }
+        return a.masteryPercent - b.masteryPercent || b.total - a.total || a.tag.localeCompare(b.tag, "en");
+      }),
+    [masterySort],
+  );
 
   async function saveQuestions() {
     setSavingQuestions(true);
@@ -122,7 +138,7 @@ export default function TeacherPaperDetailPage() {
       setError(r.error);
       return;
     }
-    await loadAnalytics(mode);
+    await loadAnalytics();
   }
 
   async function setPublish(publish: boolean) {
@@ -141,7 +157,7 @@ export default function TeacherPaperDetailPage() {
       setError(r.error);
       return;
     }
-    await loadAnalytics(mode);
+    await loadAnalytics();
   }
 
   async function deletePaper() {
@@ -176,16 +192,25 @@ export default function TeacherPaperDetailPage() {
         {analytics && <p className="text-sm font-bold text-[var(--duo-text-muted)]">{analytics.paper.title}</p>}
       </header>
       {error && (
-        <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
-          {error}
-        </p>
+        <div className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
+          <p>{error}</p>
+          {paperMissing && (
+            <button
+              type="button"
+              onClick={() => router.push("/teacher")}
+              className="mt-2 rounded-lg border-2 border-[#c00] bg-white px-3 py-1.5 text-xs font-extrabold text-[#c00]"
+            >
+              Back to Teacher
+            </button>
+          )}
+        </div>
       )}
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-2 text-sm font-extrabold text-[var(--duo-text)]">Question upload (one per line)</h2>
         <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">
           Format: <span className="font-mono">questionNumber,correctAnswer,themeCode</span>
           · theme code: <span className="font-mono">A</span>–<span className="font-mono">E</span> or{" "}
-          <span className="font-mono">G</span> (Theme M - Measurement and Data Processing). Example:{" "}
+          <span className="font-mono">M</span> (Theme M - Measurement and Data Processing). Example:{" "}
           <span className="font-mono">1,A,A</span>
         </p>
         <textarea
@@ -238,26 +263,24 @@ export default function TeacherPaperDetailPage() {
       </section>
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Overall wrong-theme distribution</h2>
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as Mode)}
-            className="rounded-lg border-2 border-[var(--duo-border)] px-2 py-1 text-xs font-bold"
-          >
-            <option value="latest">Latest only</option>
-            <option value="all">All attempts</option>
-          </select>
+          <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Overall theme mastery (correct rate)</h2>
+          <div className="flex gap-2">
+            <select
+              value={masterySort}
+              onChange={(e) => setMasterySort(e.target.value as MasterySort)}
+              className="rounded-lg border-2 border-[var(--duo-border)] px-2 py-1 text-xs font-bold"
+              aria-label="Sort mastery chart rows"
+            >
+              <option value="high_to_low">Mastery: High to low</option>
+              <option value="low_to_high">Mastery: Low to high</option>
+            </select>
+          </div>
         </div>
-        {analytics && (
-          <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">
-            {analytics.overall.studentCount} students · {analytics.overall.attemptCount} attempts · avg{" "}
-            {analytics.overall.averageAccuracy}%
-          </p>
-        )}
+        {analytics && <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">{analytics.overall.studentCount} students</p>}
         <TagStatsChart
-          rows={analytics?.overall.wrongTagCounts ?? []}
-          emptyMessage="No wrong answers yet."
-          ariaLabel="Bar chart of wrong answers per syllabus theme"
+          rows={sortMasteryRows(analytics?.overall.correctTagMastery ?? [])}
+          emptyMessage="No answers yet."
+          ariaLabel="Bar chart of mastery rate per syllabus theme"
         />
       </section>
       <section className="space-y-3">
@@ -268,14 +291,11 @@ export default function TeacherPaperDetailPage() {
           >
             <p className="text-sm font-extrabold text-[var(--duo-text)]">{s.name || "(Unnamed)"}</p>
             <p className="text-xs font-bold text-[var(--duo-text-muted)]">{s.email}</p>
-            <p className="mt-1 text-xs font-bold text-[var(--duo-blue)]">
-              Latest: {s.latestAccuracy ?? "-"}% · Attempts: {s.attemptCount}
-            </p>
             <div className="mt-2">
               <TagStatsChart
-                rows={s.wrongTagCounts}
-                emptyMessage="No wrong themes in this slice."
-                ariaLabel="Bar chart of wrong answers per syllabus theme for one student"
+                rows={sortMasteryRows(s.correctTagMastery)}
+                emptyMessage="No answers in this slice."
+                ariaLabel="Bar chart of mastery rate per syllabus theme for one student"
               />
             </div>
           </div>

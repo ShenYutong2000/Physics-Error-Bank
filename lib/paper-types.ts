@@ -19,6 +19,12 @@ export type PaperSummary = {
 };
 
 export type TagCountRow = { tag: string; count: number };
+export type TagMasteryRow = {
+  tag: string;
+  correct: number;
+  total: number;
+  masteryPercent: number;
+};
 
 export type { ChoiceOption };
 

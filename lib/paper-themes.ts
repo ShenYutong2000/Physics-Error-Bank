@@ -6,7 +6,7 @@ export const PAPER_THEME_LABELS = TAG_GROUPS.map((g) => g.theme) as readonly str
 export const PAPER_THEME_SET = new Set<string>(PAPER_THEME_LABELS);
 
 /**
- * Third column in teacher bulk upload: single letter A–E or G (Theme M),
+ * Third column in teacher bulk upload: single letter A–E or M (Theme M),
  * or the full theme string (must match TAG_GROUPS).
  */
 export const THEME_CODE_TO_LABEL: Record<string, string> = {
@@ -15,13 +15,13 @@ export const THEME_CODE_TO_LABEL: Record<string, string> = {
   C: "Theme C - Wave Behavior",
   D: "Theme D - Fields",
   E: "Theme E - Nuclear and Quantum Physics",
-  G: "Theme M - Measurement and Data Processing",
+  M: "Theme M - Measurement and Data Processing",
 };
 
 /** Legacy DB / uploads may still use "General"; merge into Theme M for display and stats. */
 export function canonicalizePaperThemeLabel(theme: string): string {
   const t = theme.trim();
-  if (t.toLowerCase() === "general") return THEME_CODE_TO_LABEL.G;
+  if (t.toLowerCase() === "general") return THEME_CODE_TO_LABEL.M;
   return t;
 }
 
@@ -31,15 +31,19 @@ export function normalizePaperTheme(raw: string): string {
     throw new Error("Theme is required for each question.");
   }
   if (t.toLowerCase() === "general") {
-    return THEME_CODE_TO_LABEL.G;
+    return THEME_CODE_TO_LABEL.M;
   }
   const code = t.toUpperCase();
+  // Backward compatibility: older uploads may still send G for Theme M.
+  if (code === "G" && t.length <= 2) {
+    return THEME_CODE_TO_LABEL.M;
+  }
   if (code in THEME_CODE_TO_LABEL && t.length <= 2) {
     return THEME_CODE_TO_LABEL[code];
   }
   const found = PAPER_THEME_LABELS.find((l) => l.toLowerCase() === t.toLowerCase());
   if (found) return found;
   throw new Error(
-    `Invalid theme: "${raw}". Use code A–E or G, or the full Theme A–E / Theme M label.`,
+    `Invalid theme: "${raw}". Use code A–E or M, or the full Theme A–E / Theme M label.`,
   );
 }
