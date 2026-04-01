@@ -136,6 +136,20 @@ export async function publishPaper(paperId: string, publish: boolean): Promise<P
   return toPaperSummary(row);
 }
 
+export type DeletePaperResult = "deleted" | "not_found" | "forbidden";
+
+/** Deletes paper, questions, and all student attempts (cascade). Only the creating teacher may delete. */
+export async function deletePaperForTeacher(paperId: string, teacherId: string): Promise<DeletePaperResult> {
+  const paper = await prisma.paper.findUnique({
+    where: { id: paperId },
+    select: { createdById: true },
+  });
+  if (!paper) return "not_found";
+  if (paper.createdById !== teacherId) return "forbidden";
+  await prisma.paper.delete({ where: { id: paperId } });
+  return "deleted";
+}
+
 export async function getPaperForAnswering(paperId: string): Promise<{
   paper: PaperSummary;
   questions: Array<{ number: number }>;

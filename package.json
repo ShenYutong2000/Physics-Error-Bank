@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:clear-all": "tsx scripts/clear-all-accounts.ts",
+    "db:clear-papers": "tsx scripts/clear-all-papers.ts",
     "teacher:add": "tsx scripts/add-teacher-email.ts",
     "postinstall": "prisma generate"
   },

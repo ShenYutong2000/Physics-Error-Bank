@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDbAndUser } from "@/lib/api-route-guards";
+import { requireStudent } from "@/lib/api-route-guards";
 import { getPaperForAnswering } from "@/lib/papers-repo";
 
 export const runtime = "nodejs";
@@ -8,7 +8,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireDbAndUser(request);
+  const guard = await requireStudent(request);
   if (!guard.ok) return guard.response;
   const { id } = await context.params;
   try {
