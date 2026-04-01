@@ -42,6 +42,9 @@ export async function POST(
     if (msg.includes("not found")) {
       return NextResponse.json({ error: msg }, { status: 404 });
     }
+    if (msg.includes("already been submitted")) {
+      return NextResponse.json({ error: "You can only submit this paper once." }, { status: 409 });
+    }
     console.error(e);
     return NextResponse.json({ error: "Could not submit paper." }, { status: 500 });
   }

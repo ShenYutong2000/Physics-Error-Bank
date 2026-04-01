@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import type { ChoiceOption, PaperSummary, TagCountRow } from "@/lib/paper-types";
+import type { ChoiceOption, PaperSummary, TagMasteryRow } from "@/lib/paper-types";
 
 type WrongQuestion = {
   questionNumber: number;
@@ -30,13 +30,39 @@ export default function PaperAttemptPage() {
     wrongCount: number;
     accuracy: number;
     wrongQuestions: WrongQuestion[];
-    wrongTagCounts: TagCountRow[];
+    correctTagMastery: TagMasteryRow[];
   } | null>(null);
+  const [submittedAnswers, setSubmittedAnswers] = useState<
+    Array<{
+      questionNumber: number;
+      answer: ChoiceOption;
+      correctAnswer: ChoiceOption;
+      isCorrect: boolean;
+    }>
+  >([]);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      const r = await apiFetchJson<{ paper: PaperSummary; questions: Array<{ number: number }> }>(
+      const r = await apiFetchJson<{
+        paper: PaperSummary;
+        questions: Array<{ number: number }>;
+        existingAttempt?: {
+          attemptId: string;
+          correctCount: number;
+          wrongCount: number;
+          accuracy: number;
+          wrongQuestions: WrongQuestion[];
+          correctTagMastery: TagMasteryRow[];
+          submittedAnswers: Array<{
+            questionNumber: number;
+            answer: ChoiceOption;
+            correctAnswer: ChoiceOption;
+            isCorrect: boolean;
+          }>;
+        } | null;
+      }>(
         `/api/papers/${encodeURIComponent(paperId)}`,
       );
       setLoading(false);
@@ -46,13 +72,37 @@ export default function PaperAttemptPage() {
       }
       setPaper(r.data.paper);
       setQuestions(r.data.questions ?? []);
-      setAnswers(Object.fromEntries((r.data.questions ?? []).map((q) => [q.number, "BLANK"])));
+      const answerMap = Object.fromEntries((r.data.questions ?? []).map((q) => [q.number, "BLANK"])) as Record<
+        number,
+        ChoiceOption
+      >;
+      setAnswers(answerMap);
+      if (r.data.existingAttempt) {
+        setAlreadySubmitted(true);
+        setResult({
+          attemptId: r.data.existingAttempt.attemptId,
+          correctCount: r.data.existingAttempt.correctCount,
+          wrongCount: r.data.existingAttempt.wrongCount,
+          accuracy: r.data.existingAttempt.accuracy,
+          wrongQuestions: r.data.existingAttempt.wrongQuestions,
+          correctTagMastery: r.data.existingAttempt.correctTagMastery,
+        });
+        setSubmittedAnswers(r.data.existingAttempt.submittedAnswers);
+      } else {
+        setAlreadySubmitted(false);
+        setResult(null);
+        setSubmittedAnswers([]);
+      }
     })();
   }, [paperId]);
 
   const answeredCount = useMemo(
     () => Object.values(answers).filter((v) => v !== "BLANK").length,
     [answers],
+  );
+  const submittedAnsweredCount = useMemo(
+    () => submittedAnswers.filter((a) => a.answer !== "BLANK").length,
+    [submittedAnswers],
   );
 
   async function submit() {
@@ -70,7 +120,7 @@ export default function PaperAttemptPage() {
       wrongCount: number;
       accuracy: number;
       wrongQuestions: WrongQuestion[];
-      wrongTagCounts: TagCountRow[];
+      correctTagMastery: TagMasteryRow[];
     }>(`/api/papers/${encodeURIComponent(paperId)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -90,6 +140,9 @@ export default function PaperAttemptPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+      <div className="mb-3 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-extrabold text-[#a60]">
+        Each paper can only be submitted once.
+      </div>
       {paper && (
         <header className="mb-4">
           <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Paper</p>
@@ -97,7 +150,7 @@ export default function PaperAttemptPage() {
             {paper.year} {paper.session}
           </h1>
           <p className="text-sm font-bold text-[var(--duo-text-muted)]">
-            {paper.title} · {answeredCount}/{questions.length} answered
+            {paper.title} · {(alreadySubmitted ? submittedAnsweredCount : answeredCount)}/{questions.length} answered
           </p>
         </header>
       )}
@@ -106,36 +159,72 @@ export default function PaperAttemptPage() {
           {error}
         </p>
       )}
+      {alreadySubmitted && (
+        <p className="mb-3 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-extrabold text-[#a60]">
+          You have already submitted this paper. Showing your only submission.
+        </p>
+      )}
       <section className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="space-y-2">
-          {questions.map((q) => (
-            <div key={q.number} className="flex items-center justify-between gap-2 rounded-xl bg-[var(--duo-surface)] p-2">
-              <span className="text-sm font-extrabold text-[var(--duo-text)]">Q{q.number}</span>
-              <select
-                value={answers[q.number] ?? "BLANK"}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [q.number]: e.target.value as ChoiceOption }))
-                }
-                className="rounded-lg border-2 border-[var(--duo-border)] bg-white px-2 py-1 text-sm font-bold"
-              >
-                {CHOICES.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "BLANK" ? "-" : c}
-                  </option>
-                ))}
-              </select>
+          {(alreadySubmitted
+            ? submittedAnswers
+            : questions.map((q) => ({
+                questionNumber: q.number,
+                answer: answers[q.number] ?? ("BLANK" as ChoiceOption),
+                correctAnswer: "BLANK" as ChoiceOption,
+                isCorrect: false,
+              }))
+          ).map((q) => (
+            <div key={q.questionNumber} className="flex items-center justify-between gap-2 rounded-xl bg-[var(--duo-surface)] p-2">
+              <span className="text-sm font-extrabold text-[var(--duo-text)]">Q{q.questionNumber}</span>
+              {alreadySubmitted ? (
+                <span
+                  className={`rounded-lg border-2 px-2 py-1 text-sm font-bold ${
+                    q.answer === "BLANK"
+                      ? "border-[var(--duo-border)] bg-white text-[var(--duo-text-muted)]"
+                      : q.isCorrect
+                        ? "border-[#4caf50] bg-[#e9fbe9] text-[#1f7a1f]"
+                        : "border-[#ff4b4b] bg-[#ffe8e8] text-[#c00]"
+                  }`}
+                  title={
+                    q.answer === "BLANK"
+                      ? "No answer submitted"
+                      : q.isCorrect
+                        ? "Correct answer"
+                        : `Wrong answer. Correct: ${q.correctAnswer}`
+                  }
+                >
+                  {q.answer === "BLANK" ? "-" : q.answer}
+                </span>
+              ) : (
+                <select
+                  value={answers[q.questionNumber] ?? "BLANK"}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, [q.questionNumber]: e.target.value as ChoiceOption }))
+                  }
+                  className="rounded-lg border-2 border-[var(--duo-border)] bg-white px-2 py-1 text-sm font-bold"
+                >
+                  {CHOICES.map((c) => (
+                    <option key={c} value={c}>
+                      {c === "BLANK" ? "-" : c}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           ))}
         </div>
       </section>
-      <button
-        type="button"
-        disabled={submitting}
-        onClick={() => void submit()}
-        className="duo-btn-primary mt-4 w-full py-3 text-base disabled:opacity-60"
-      >
-        {submitting ? "Submitting..." : "Submit answers"}
-      </button>
+      {!alreadySubmitted && (
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => void submit()}
+          className="duo-btn-primary mt-4 w-full py-3 text-base disabled:opacity-60"
+        >
+          {submitting ? "Submitting..." : "Submit answers"}
+        </button>
+      )}
 
       {result && (
         <section className="mt-6 space-y-4">
@@ -148,11 +237,11 @@ export default function PaperAttemptPage() {
             </p>
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
-            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Wrong-theme distribution</h2>
+            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Theme mastery (correct rate)</h2>
             <TagStatsChart
-              rows={result.wrongTagCounts}
-              emptyMessage="No wrong themes."
-              ariaLabel="Bar chart of wrong answers per syllabus theme"
+              rows={result.correctTagMastery}
+              emptyMessage="No answers yet."
+              ariaLabel="Bar chart of mastery rate per syllabus theme"
             />
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
