@@ -4,20 +4,27 @@ import { normalizeEmail } from "@/lib/auth-validation";
 
 export type UserRoleName = "STUDENT" | "TEACHER";
 
-function parseTeacherEmailsFromEnv(): Set<string> {
-  const raw = process.env.TEACHER_EMAILS ?? "";
-  const defaults = ["yutshen@uwcchina.org"];
-  const fromEnv = raw.split(",").map((s) => normalizeEmail(s)).filter(Boolean);
-  return new Set(
-    [...defaults, ...fromEnv].map((s) => normalizeEmail(s)).filter(Boolean),
-  );
+/** Built-in defaults; merged with TEACHER_EMAILS (comma-separated). Cached for process lifetime. */
+const DEFAULT_TEACHER_EMAILS = ["yutshen@uwcchina.org"] as const;
+
+let cachedTeacherEmailsFromEnv: Set<string> | null = null;
+
+function getTeacherEmailsFromEnv(): Set<string> {
+  if (!cachedTeacherEmailsFromEnv) {
+    const raw = process.env.TEACHER_EMAILS ?? "";
+    const fromEnv = raw.split(",").map((s) => normalizeEmail(s)).filter(Boolean);
+    cachedTeacherEmailsFromEnv = new Set([
+      ...DEFAULT_TEACHER_EMAILS.map((s) => normalizeEmail(s)),
+      ...fromEnv,
+    ]);
+  }
+  return cachedTeacherEmailsFromEnv;
 }
 
 export async function isTeacherEmail(emailRaw: string): Promise<boolean> {
   const email = normalizeEmail(emailRaw);
   if (!email) return false;
-  const envSet = parseTeacherEmailsFromEnv();
-  if (envSet.has(email)) return true;
+  if (getTeacherEmailsFromEnv().has(email)) return true;
   if (!isDatabaseConfigured()) return false;
   // Use $queryRaw so we do not depend on PrismaClient delegate typings when `prisma generate` is stale.
   const rows = await prisma.$queryRaw<Array<{ id: string }>>(
