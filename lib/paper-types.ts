@@ -26,6 +26,22 @@ export type TagMasteryRow = {
   masteryPercent: number;
 };
 
+/** Per-question aggregate across student attempts (latest attempt per paper). */
+export type PublishedPaperQuestionStat = {
+  questionNumber: number;
+  correctCount: number;
+  attemptCount: number;
+  correctRatePercent: number;
+};
+
+/** One published paper plus global question-level stats for all students. */
+export type PublishedPaperStatsRow = {
+  paper: PaperSummary;
+  attemptCount: number;
+  averageAccuracy: number;
+  questions: PublishedPaperQuestionStat[];
+};
+
 export type { ChoiceOption };
 
 /** Normalize client/API answer strings to a stored choice (or BLANK). */

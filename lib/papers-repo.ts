@@ -6,6 +6,8 @@ import {
   type ExamSession,
   type TagMasteryRow,
   type PaperSummary,
+  type PublishedPaperQuestionStat,
+  type PublishedPaperStatsRow,
 } from "@/lib/paper-types";
 import { canonicalizePaperThemeLabel, normalizePaperTheme } from "@/lib/paper-themes";
 
@@ -443,5 +445,89 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
     },
     students,
   };
+}
+
+/** All published papers: per-question correct rate across students (latest attempt per student per paper). */
+export async function getPublishedPapersAggregateQuestionStats(): Promise<PublishedPaperStatsRow[]> {
+  const papers = await prisma.paper.findMany({
+    where: { publishedAt: { not: null } },
+    orderBy: [{ year: "desc" }, { session: "desc" }],
+    include: {
+      questions: { select: { number: true }, orderBy: { number: "asc" } },
+    },
+  });
+  const out: PublishedPaperStatsRow[] = [];
+  for (const paper of papers) {
+    const attempts = await prisma.paperAttempt.findMany({
+      where: {
+        paperId: paper.id,
+        isLatest: true,
+        user: { role: "STUDENT" },
+      },
+      include: { answers: true },
+    });
+    const attemptCount = attempts.length;
+    const nums = paper.questions.map((q) => q.number);
+    const questions: PublishedPaperQuestionStat[] = nums.map((questionNumber) => {
+      let correctCount = 0;
+      for (const att of attempts) {
+        const ans = att.answers.find((a) => a.questionNumber === questionNumber);
+        if (ans?.isCorrect) correctCount += 1;
+      }
+      const correctRatePercent =
+        attemptCount > 0 ? Number(((correctCount / attemptCount) * 100).toFixed(1)) : 0;
+      return {
+        questionNumber,
+        correctCount,
+        attemptCount,
+        correctRatePercent,
+      };
+    });
+    const averageAccuracy =
+      attemptCount > 0
+        ? Number(
+            (attempts.reduce((sum, a) => sum + Number(a.accuracy), 0) / attemptCount).toFixed(2),
+          )
+        : 0;
+    out.push({
+      paper: toPaperSummary(paper),
+      attemptCount,
+      averageAccuracy,
+      questions,
+    });
+  }
+  return out;
+}
+
+/** Theme mastery across all published papers for one student (one attempt per paper). */
+export async function getCrossPaperThemeMasteryForUser(userId: string): Promise<TagMasteryRow[]> {
+  const attempts = await prisma.paperAttempt.findMany({
+    where: {
+      userId,
+      isLatest: true,
+      paper: { publishedAt: { not: null } },
+    },
+    include: { answers: true },
+  });
+  const items = attempts.flatMap((a) =>
+    a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+  );
+  return toThemeMasteryRows(items);
+}
+
+/** Class-wide theme mastery: all student answers on published papers (latest attempts). */
+export async function getCrossPaperThemeMasteryClassWide(): Promise<TagMasteryRow[]> {
+  const attempts = await prisma.paperAttempt.findMany({
+    where: {
+      isLatest: true,
+      user: { role: "STUDENT" },
+      paper: { publishedAt: { not: null } },
+    },
+    include: { answers: true },
+  });
+  const items = attempts.flatMap((a) =>
+    a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+  );
+  return toThemeMasteryRows(items);
 }
 

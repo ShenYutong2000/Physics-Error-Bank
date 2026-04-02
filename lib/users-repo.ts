@@ -292,3 +292,15 @@ export async function updateUserName(
   });
   return { ok: true };
 }
+
+/** For teacher dropdowns: all student accounts. */
+export async function listStudentUsersBrief(): Promise<
+  Array<{ id: string; name: string; email: string }>
+> {
+  if (!isDatabaseConfigured()) return [];
+  return prisma.user.findMany({
+    where: { role: "STUDENT" },
+    select: { id: true, name: true, email: true },
+    orderBy: [{ name: "asc" }, { email: "asc" }],
+  });
+}
