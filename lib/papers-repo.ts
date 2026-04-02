@@ -140,6 +140,27 @@ export async function createPaper(input: {
   return toPaperSummary(row);
 }
 
+/** Teacher view: all saved keys for one paper (empty array if none). */
+export async function getPaperQuestionsWithAnswers(
+  paperId: string,
+): Promise<Array<{ number: number; correctAnswer: ChoiceOption; theme: string }> | null> {
+  const paper = await prisma.paper.findUnique({
+    where: { id: paperId },
+    select: { id: true },
+  });
+  if (!paper) return null;
+  const rows = await prisma.paperQuestion.findMany({
+    where: { paperId },
+    orderBy: { number: "asc" },
+    select: { number: true, correctAnswer: true, theme: true },
+  });
+  return rows.map((r) => ({
+    number: r.number,
+    correctAnswer: r.correctAnswer as ChoiceOption,
+    theme: r.theme,
+  }));
+}
+
 export async function upsertPaperQuestions(paperId: string, questions: PaperQuestionInput[]): Promise<void> {
   const normalized = questions
     .map((q) => ({
@@ -183,18 +204,46 @@ export async function publishPaper(paperId: string, publish: boolean): Promise<P
   return toPaperSummary(row);
 }
 
-export type DeletePaperResult = "deleted" | "not_found" | "forbidden";
+export type DeletePaperResult = "deleted" | "not_found";
 
-/** Deletes paper, questions, and all student attempts (cascade). Only the creating teacher may delete. */
-export async function deletePaperForTeacher(paperId: string, teacherId: string): Promise<DeletePaperResult> {
+/** Deletes paper, questions, and all student attempts (cascade). Any teacher may delete (API enforces TEACHER role). */
+export async function deletePaperForTeacher(paperId: string): Promise<DeletePaperResult> {
   const paper = await prisma.paper.findUnique({
     where: { id: paperId },
-    select: { createdById: true },
+    select: { id: true },
   });
   if (!paper) return "not_found";
-  if (paper.createdById !== teacherId) return "forbidden";
   await prisma.paper.delete({ where: { id: paperId } });
   return "deleted";
+}
+
+export type ClearPaperAttemptsResult = "not_found" | { ok: true; deletedCount: number };
+
+/**
+ * Deletes all student `PaperAttempt` rows (and answers) for one paper. The paper and its questions stay.
+ * Any teacher may clear (API enforces TEACHER role).
+ */
+export async function clearStudentAttemptsForPaper(paperId: string): Promise<ClearPaperAttemptsResult> {
+  const paper = await prisma.paper.findUnique({
+    where: { id: paperId },
+    select: { id: true },
+  });
+  if (!paper) return "not_found";
+  const result = await prisma.paperAttempt.deleteMany({
+    where: {
+      paperId,
+      user: { role: "STUDENT" },
+    },
+  });
+  return { ok: true, deletedCount: result.count };
+}
+
+/** Deletes every student paper attempt across all papers. Papers and questions are unchanged. */
+export async function clearAllStudentPaperAttemptsEverywhere(): Promise<{ deletedCount: number }> {
+  const result = await prisma.paperAttempt.deleteMany({
+    where: { user: { role: "STUDENT" } },
+  });
+  return { deletedCount: result.count };
 }
 
 export async function getPaperForAnswering(paperId: string): Promise<{

@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/api-route-guards";
-import { upsertPaperQuestions } from "@/lib/papers-repo";
+import { getPaperQuestionsWithAnswers, upsertPaperQuestions } from "@/lib/papers-repo";
 import { normalizePaperTheme } from "@/lib/paper-themes";
 
 export const runtime = "nodejs";
+
+/** List saved correct answers and themes (teachers only). */
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireTeacher(request);
+  if (!guard.ok) return guard.response;
+  const { id } = await context.params;
+  try {
+    const questions = await getPaperQuestionsWithAnswers(id);
+    if (!questions) {
+      return NextResponse.json({ error: "Paper not found." }, { status: 404 });
+    }
+    return NextResponse.json({ questions });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Failed to load questions." }, { status: 500 });
+  }
+}
 
 type Body = {
   questions?: Array<{

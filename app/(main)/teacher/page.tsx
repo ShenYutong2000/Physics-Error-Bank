@@ -12,6 +12,7 @@ export default function TeacherHomePage() {
   const [session, setSession] = useState<ExamSession>("MAY");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [clearAllSubmissionsBusy, setClearAllSubmissionsBusy] = useState(false);
 
   async function loadPapers() {
     const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
@@ -52,6 +53,36 @@ export default function TeacherHomePage() {
       return;
     }
     setTitle("");
+    await loadPapers();
+  }
+
+  async function clearAllStudentPaperSubmissions() {
+    if (
+      !window.confirm(
+        "Remove ALL student submissions for EVERY paper in the bank?\n\nAll students will be able to submit each paper again as if they had never taken it. Papers and questions are not deleted. The mistake library is not affected.\n\nThis cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "Second confirmation: permanently delete every stored paper attempt for all students on all papers?",
+      )
+    ) {
+      return;
+    }
+    setClearAllSubmissionsBusy(true);
+    setError(null);
+    const r = await apiFetchJson<{ ok: true; deletedCount: number }>("/api/teacher/clear-all-paper-submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    setClearAllSubmissionsBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
     await loadPapers();
   }
 
@@ -130,6 +161,22 @@ export default function TeacherHomePage() {
             </p>
           </Link>
         ))}
+      </section>
+
+      <section className="mt-8 rounded-2xl border-2 border-[#ff9800] bg-[#fffaf2] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Reset all paper attempts</h2>
+        <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
+          Clears every student&apos;s submissions on every paper at once. Students can take each paper again. Does not
+          delete papers, questions, or mistake-library entries.
+        </p>
+        <button
+          type="button"
+          onClick={() => void clearAllStudentPaperSubmissions()}
+          disabled={clearAllSubmissionsBusy}
+          className="mt-3 w-full rounded-xl border-2 border-[#ff9800] bg-white py-2.5 text-xs font-extrabold text-[#a60] disabled:opacity-60"
+        >
+          {clearAllSubmissionsBusy ? "Clearing…" : "Clear all students’ submissions (all papers)"}
+        </button>
       </section>
     </div>
   );
