@@ -6,10 +6,11 @@ import {
   type ExamSession,
   type TagMasteryRow,
   type PaperSummary,
+  type PaperThemeCountRow,
   type PublishedPaperQuestionStat,
   type PublishedPaperStatsRow,
 } from "@/lib/paper-types";
-import { canonicalizePaperThemeLabel, normalizePaperTheme } from "@/lib/paper-themes";
+import { canonicalizePaperThemeLabel, normalizePaperTheme, PAPER_THEME_LABELS } from "@/lib/paper-themes";
 
 type PaperQuestionInput = {
   number: number;
@@ -38,6 +39,39 @@ function toPaperSummary(row: {
     questionCount: row.questionCount,
     publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
   };
+}
+
+function sortThemesBySyllabusOrder(rows: PaperThemeCountRow[]): PaperThemeCountRow[] {
+  const order = new Map(PAPER_THEME_LABELS.map((t, i) => [t, i]));
+  return [...rows].sort((a, b) => {
+    const ia = order.get(a.theme);
+    const ib = order.get(b.theme);
+    if (ia !== undefined && ib !== undefined) return ia - ib;
+    if (ia !== undefined) return -1;
+    if (ib !== undefined) return 1;
+    return a.theme.localeCompare(b.theme, "en");
+  });
+}
+
+/** Count questions per theme on a paper (from stored question rows). */
+export function buildPaperThemeQuestionCounts(questions: Array<{ theme: string }>): PaperThemeCountRow[] {
+  const map = new Map<string, number>();
+  for (const q of questions) {
+    const t = canonicalizePaperThemeLabel(q.theme);
+    if (!t) continue;
+    map.set(t, (map.get(t) ?? 0) + 1);
+  }
+  return sortThemesBySyllabusOrder(
+    Array.from(map.entries()).map(([theme, questionCount]) => ({ theme, questionCount })),
+  );
+}
+
+export async function getPaperThemeQuestionCounts(paperId: string): Promise<PaperThemeCountRow[]> {
+  const rows = await prisma.paperQuestion.findMany({
+    where: { paperId },
+    select: { theme: true },
+  });
+  return buildPaperThemeQuestionCounts(rows);
 }
 
 /** Objective mastery by theme: correct/total and percentage. */
@@ -166,12 +200,13 @@ export async function deletePaperForTeacher(paperId: string, teacherId: string):
 export async function getPaperForAnswering(paperId: string): Promise<{
   paper: PaperSummary;
   questions: Array<{ number: number }>;
+  themeQuestionCounts: PaperThemeCountRow[];
 } | null> {
   const row = await prisma.paper.findUnique({
     where: { id: paperId },
     include: {
       questions: {
-        select: { number: true },
+        select: { number: true, theme: true },
         orderBy: { number: "asc" },
       },
     },
@@ -180,6 +215,7 @@ export async function getPaperForAnswering(paperId: string): Promise<{
   return {
     paper: toPaperSummary(row),
     questions: row.questions.map((q) => ({ number: q.number })),
+    themeQuestionCounts: buildPaperThemeQuestionCounts(row.questions),
   };
 }
 
@@ -207,6 +243,7 @@ export async function getStudentPaperAttemptSummary(paperId: string, userId: str
       correctAnswer: a.correctAnswer as ChoiceOption,
       isCorrect: a.isCorrect,
     }));
+  const themeQuestionCounts = await getPaperThemeQuestionCounts(paperId);
   return {
     attemptId: row.id,
     submittedAt: row.submittedAt.toISOString(),
@@ -217,6 +254,7 @@ export async function getStudentPaperAttemptSummary(paperId: string, userId: str
     correctTagMastery: toThemeMasteryRows(
       row.answers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
     ),
+    themeQuestionCounts,
     submittedAnswers,
   };
 }
@@ -238,6 +276,7 @@ export async function submitPaperAttempt(input: {
     theme: string;
   }>;
   correctTagMastery: TagMasteryRow[];
+  themeQuestionCounts: PaperThemeCountRow[];
 }> {
   const paper = await prisma.paper.findUnique({
     where: { id: input.paperId },
@@ -285,6 +324,7 @@ export async function submitPaperAttempt(input: {
   const wrongCount = wrongQuestions.length;
   const accuracy = paper.questions.length > 0 ? Number(((correctCount / paper.questions.length) * 100).toFixed(2)) : 0;
   const correctTagMastery = toThemeMasteryRows(judged.map((j) => ({ theme: j.theme, isCorrect: j.isCorrect })));
+  const themeQuestionCounts = buildPaperThemeQuestionCounts(paper.questions);
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.paperAttempt.updateMany({
@@ -324,6 +364,7 @@ export async function submitPaperAttempt(input: {
     accuracy,
     wrongQuestions,
     correctTagMastery,
+    themeQuestionCounts,
   };
 }
 
@@ -333,6 +374,7 @@ export async function getAttemptDetail(attemptId: string, userId: string) {
     include: { answers: true },
   });
   if (!row) return null;
+  const themeQuestionCounts = await getPaperThemeQuestionCounts(row.paperId);
   const wrongQuestions = row.answers
     .filter((a) => !a.isCorrect)
     .sort((a, b) => a.questionNumber - b.questionNumber)
@@ -355,6 +397,7 @@ export async function getAttemptDetail(attemptId: string, userId: string) {
     correctTagMastery: toThemeMasteryRows(
       row.answers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
     ),
+    themeQuestionCounts,
   };
 }
 
@@ -368,9 +411,11 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
       session: true,
       questionCount: true,
       publishedAt: true,
+      questions: { select: { theme: true } },
     },
   });
   if (!paper) return null;
+  const themeQuestionCounts = buildPaperThemeQuestionCounts(paper.questions);
   const attempts = await prisma.paperAttempt.findMany({
     where: {
       paperId,
@@ -436,6 +481,7 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
     : 0;
   return {
     paper: toPaperSummary(paper),
+    themeQuestionCounts,
     mode,
     overall: {
       studentCount: byStudent.size,

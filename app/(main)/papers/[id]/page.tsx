@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
+import { PaperThemeBreakdownTable } from "@/components/paper-theme-breakdown";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import type { ChoiceOption, PaperSummary, TagMasteryRow } from "@/lib/paper-types";
+import type { ChoiceOption, PaperSummary, PaperThemeCountRow, TagMasteryRow } from "@/lib/paper-types";
 
 type WrongQuestion = {
   questionNumber: number;
@@ -42,6 +43,7 @@ export default function PaperAttemptPage() {
     }>
   >([]);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [themeQuestionCounts, setThemeQuestionCounts] = useState<PaperThemeCountRow[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -49,6 +51,7 @@ export default function PaperAttemptPage() {
       const r = await apiFetchJson<{
         paper: PaperSummary;
         questions: Array<{ number: number }>;
+        themeQuestionCounts: PaperThemeCountRow[];
         existingAttempt?: {
           attemptId: string;
           correctCount: number;
@@ -56,6 +59,7 @@ export default function PaperAttemptPage() {
           accuracy: number;
           wrongQuestions: WrongQuestion[];
           correctTagMastery: TagMasteryRow[];
+          themeQuestionCounts: PaperThemeCountRow[];
           submittedAnswers: Array<{
             questionNumber: number;
             answer: ChoiceOption;
@@ -73,6 +77,7 @@ export default function PaperAttemptPage() {
       }
       setPaper(r.data.paper);
       setQuestions(r.data.questions ?? []);
+      setThemeQuestionCounts(r.data.themeQuestionCounts ?? []);
       const answerMap = Object.fromEntries((r.data.questions ?? []).map((q) => [q.number, "BLANK"])) as Record<
         number,
         ChoiceOption
@@ -122,6 +127,7 @@ export default function PaperAttemptPage() {
       accuracy: number;
       wrongQuestions: WrongQuestion[];
       correctTagMastery: TagMasteryRow[];
+      themeQuestionCounts: PaperThemeCountRow[];
     }>(`/api/papers/${encodeURIComponent(paperId)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,6 +139,7 @@ export default function PaperAttemptPage() {
       return;
     }
     setResult(r.data);
+    setThemeQuestionCounts(r.data.themeQuestionCounts ?? []);
   }
 
   if (loading) {
@@ -250,6 +257,16 @@ export default function PaperAttemptPage() {
             <p className="text-sm font-bold text-[var(--duo-text-muted)]">
               Wrong: {result.wrongCount}
             </p>
+          </div>
+          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <PaperThemeBreakdownTable
+              themeQuestionCounts={themeQuestionCounts}
+              masteryRows={result.correctTagMastery}
+              title="This paper — questions & your results by theme"
+              description="How many questions each theme has on this paper, and how many you answered correctly."
+              correctColumnLabel="You (correct / on paper)"
+              scoreMode="perPaper"
+            />
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Theme mastery (correct rate)</h2>

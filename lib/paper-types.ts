@@ -26,6 +26,12 @@ export type TagMasteryRow = {
   masteryPercent: number;
 };
 
+/** How many questions on one paper fall under each IB Theme label. */
+export type PaperThemeCountRow = {
+  theme: string;
+  questionCount: number;
+};
+
 /** Per-question aggregate across student attempts (latest attempt per paper). */
 export type PublishedPaperQuestionStat = {
   questionNumber: number;

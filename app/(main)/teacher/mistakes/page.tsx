@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { apiFetchJson } from "@/lib/api-client";
 import type { StudentMistakeAnalyticsRow } from "@/lib/teacher-mistake-analytics";
@@ -20,10 +20,50 @@ function displayStudentLabel(s: StudentMistakeAnalyticsRow): string {
   return local || "Student";
 }
 
+type StudentListSort = "name_az" | "mistakes_high" | "mistakes_low";
+
 export default function TeacherMistakesAnalyticsPage() {
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentListSort, setStudentListSort] = useState<StudentListSort>("name_az");
+
+  const displayedStudents = useMemo(() => {
+    const list = data?.students ?? [];
+    const q = studentSearch.trim().toLowerCase();
+    const filtered = !q
+      ? [...list]
+      : list.filter((s) => {
+          const name = (s.name ?? "").toLowerCase();
+          const email = (s.email ?? "").toLowerCase();
+          const label = displayStudentLabel(s).toLowerCase();
+          return name.includes(q) || email.includes(q) || label.includes(q);
+        });
+
+    if (studentListSort === "name_az") {
+      filtered.sort((a, b) => displayStudentLabel(a).localeCompare(displayStudentLabel(b), "en"));
+    } else if (studentListSort === "mistakes_high") {
+      filtered.sort(
+        (a, b) =>
+          b.mistakeCount - a.mistakeCount ||
+          displayStudentLabel(a).localeCompare(displayStudentLabel(b), "en"),
+      );
+    } else {
+      filtered.sort(
+        (a, b) =>
+          a.mistakeCount - b.mistakeCount ||
+          displayStudentLabel(a).localeCompare(displayStudentLabel(b), "en"),
+      );
+    }
+    return filtered;
+  }, [data?.students, studentSearch, studentListSort]);
+
+  useEffect(() => {
+    if (!expandedId) return;
+    const visible = displayedStudents.some((s) => s.userId === expandedId);
+    if (!visible) setExpandedId(null);
+  }, [displayedStudents, expandedId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,10 +129,53 @@ export default function TeacherMistakesAnalyticsPage() {
             />
           </section>
 
-          <section>
-            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">By student</h2>
+          <section aria-label="Student mistake lists">
+            <div className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="text-sm font-extrabold text-[var(--duo-text)]">By student</h2>
+              <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">
+                Search by display name or email. Sort by name or mistake count.
+              </p>
+              <label className="mt-3 block">
+                <span className="sr-only">Search students</span>
+                <input
+                  type="search"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Search name or email…"
+                  autoComplete="off"
+                  className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2.5 text-sm font-bold placeholder:text-[var(--duo-text-muted)]"
+                  aria-label="Filter students by name or email"
+                />
+              </label>
+              <label className="mt-3 block">
+                <span className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">Sort list</span>
+                <select
+                  value={studentListSort}
+                  onChange={(e) => setStudentListSort(e.target.value as StudentListSort)}
+                  className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+                  aria-label="Sort students by name or mistake count"
+                >
+                  <option value="name_az">Name (A–Z)</option>
+                  <option value="mistakes_high">Mistakes (most to fewest)</option>
+                  <option value="mistakes_low">Mistakes (fewest to most)</option>
+                </select>
+              </label>
+              {data.students.length > 0 && (
+                <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
+                  Showing {displayedStudents.length} of {data.students.length}
+                  {studentSearch.trim() ? " (filtered)" : ""}
+                </p>
+              )}
+            </div>
+
+            {data.students.length > 0 && displayedStudents.length === 0 && (
+              <p className="mb-3 rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+                No students match &ldquo;{studentSearch.trim()}&rdquo;. Try another name or email.
+              </p>
+            )}
+
             <div className="space-y-3">
-              {data.students.map((s) => {
+              {displayedStudents.map((s) => {
                 const open = expandedId === s.userId;
                 return (
                   <div
