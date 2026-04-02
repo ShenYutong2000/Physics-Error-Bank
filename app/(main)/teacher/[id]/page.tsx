@@ -3,11 +3,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
+import { PaperThemeBreakdownTable } from "@/components/paper-theme-breakdown";
 import { TagStatsChart } from "@/components/tag-stats-chart";
-import type { ChoiceOption, TagMasteryRow } from "@/lib/paper-types";
+import type { ChoiceOption, PaperThemeCountRow, TagMasteryRow } from "@/lib/paper-types";
 import { PAPER_THEME_LABELS } from "@/lib/paper-themes";
 
 type MasterySort = "high_to_low" | "low_to_high";
+
+type StudentListSort = "name_az" | "accuracy_high" | "accuracy_low";
+
+function compareAccuracyHighToLow(a: number | null | undefined, b: number | null | undefined): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return b - a;
+}
+
+function compareAccuracyLowToHigh(a: number | null | undefined, b: number | null | undefined): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return a - b;
+}
 
 type AnalyticsResponse = {
   paper: {
@@ -18,6 +35,7 @@ type AnalyticsResponse = {
     questionCount: number;
     publishedAt: string | null;
   };
+  themeQuestionCounts: PaperThemeCountRow[];
   overall: {
     studentCount: number;
     correctTagMastery: TagMasteryRow[];
@@ -26,6 +44,7 @@ type AnalyticsResponse = {
     userId: string;
     name: string;
     email: string;
+    latestAccuracy: number | null;
     correctTagMastery: TagMasteryRow[];
   }>;
 };
@@ -42,6 +61,13 @@ export default function TeacherPaperDetailPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [questionsText, setQuestionsText] = useState("1,A,A\n2,B,B");
   const [paperMissing, setPaperMissing] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentListSort, setStudentListSort] = useState<StudentListSort>("name_az");
+
+  useEffect(() => {
+    setStudentSearch("");
+    setStudentListSort("name_az");
+  }, [paperId]);
 
   const fetchAnalytics = useCallback(
     () => apiFetchJson<AnalyticsResponse>(`/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=latest`),
@@ -115,6 +141,35 @@ export default function TeacherPaperDetailPage() {
       }),
     [masterySort],
   );
+
+  const displayedStudents = useMemo(() => {
+    const list = analytics?.students ?? [];
+    const q = studentSearch.trim().toLowerCase();
+    const filtered = !q
+      ? [...list]
+      : list.filter((s) => {
+          const name = (s.name ?? "").toLowerCase();
+          const email = (s.email ?? "").toLowerCase();
+          return name.includes(q) || email.includes(q);
+        });
+
+    if (studentListSort === "name_az") {
+      filtered.sort((a, b) => (a.name || "").localeCompare(b.name || "", "en"));
+    } else if (studentListSort === "accuracy_high") {
+      filtered.sort(
+        (a, b) =>
+          compareAccuracyHighToLow(a.latestAccuracy, b.latestAccuracy) ||
+          (a.name || "").localeCompare(b.name || "", "en"),
+      );
+    } else {
+      filtered.sort(
+        (a, b) =>
+          compareAccuracyLowToHigh(a.latestAccuracy, b.latestAccuracy) ||
+          (a.name || "").localeCompare(b.name || "", "en"),
+      );
+    }
+    return filtered;
+  }, [analytics?.students, studentSearch, studentListSort]);
 
   async function saveQuestions() {
     setSavingQuestions(true);
@@ -261,6 +316,18 @@ export default function TeacherPaperDetailPage() {
           Unpublish, edit, then Publish again.
         </p>
       </section>
+      {analytics && analytics.themeQuestionCounts.length > 0 && (
+        <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+          <PaperThemeBreakdownTable
+            themeQuestionCounts={analytics.themeQuestionCounts}
+            masteryRows={analytics.overall.correctTagMastery}
+            title="This paper — questions & class results by theme"
+            description="Questions per theme on this paper, and class-wide correct answers (all student attempts included in totals)."
+            correctColumnLabel="Class (correct / total)"
+            scoreMode="aggregate"
+          />
+        </section>
+      )}
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Overall theme mastery (correct rate)</h2>
@@ -283,24 +350,91 @@ export default function TeacherPaperDetailPage() {
           ariaLabel="Bar chart of mastery rate per syllabus theme"
         />
       </section>
-      <section className="space-y-3">
-        {analytics?.students.map((s) => (
-          <div
-            key={s.userId}
-            className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
-          >
-            <p className="text-sm font-extrabold text-[var(--duo-text)]">{s.name || "(Unnamed)"}</p>
-            <p className="text-xs font-bold text-[var(--duo-text-muted)]">{s.email}</p>
-            <div className="mt-2">
-              <TagStatsChart
-                rows={sortMasteryRows(s.correctTagMastery)}
-                emptyMessage="No answers in this slice."
-                ariaLabel="Bar chart of mastery rate per syllabus theme for one student"
+      {analytics && (
+        <section className="space-y-3" aria-label="Student submissions">
+          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Student submissions</h2>
+            <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">
+              Search by display name or email to find a student quickly.
+            </p>
+            <label className="mt-3 block">
+              <span className="sr-only">Search students</span>
+              <input
+                type="search"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Search name or email…"
+                autoComplete="off"
+                className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2.5 text-sm font-bold placeholder:text-[var(--duo-text-muted)]"
+                aria-label="Filter students by name or email"
               />
-            </div>
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">Sort list</span>
+              <select
+                value={studentListSort}
+                onChange={(e) => setStudentListSort(e.target.value as StudentListSort)}
+                className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+                aria-label="Sort students by name or accuracy"
+              >
+                <option value="name_az">Name (A–Z)</option>
+                <option value="accuracy_high">Accuracy (high to low)</option>
+                <option value="accuracy_low">Accuracy (low to high)</option>
+              </select>
+            </label>
+            {analytics.students.length > 0 && (
+              <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
+                Showing {displayedStudents.length} of {analytics.students.length}
+                {studentSearch.trim() ? " (filtered)" : ""}
+              </p>
+            )}
           </div>
-        ))}
-      </section>
+          {analytics.students.length > 0 && displayedStudents.length === 0 && (
+            <p className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+              No students match &ldquo;{studentSearch.trim()}&rdquo;. Try another name or email.
+            </p>
+          )}
+          {displayedStudents.map((s) => (
+            <div
+              key={s.userId}
+              className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-extrabold text-[var(--duo-text)]">{s.name || "(Unnamed)"}</p>
+                {s.latestAccuracy != null && (
+                  <span className="shrink-0 rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-0.5 text-xs font-extrabold tabular-nums text-[var(--duo-green-dark)]">
+                    {s.latestAccuracy}%
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-bold text-[var(--duo-text-muted)]">{s.email}</p>
+              {analytics.themeQuestionCounts.length > 0 && (
+                <div className="mt-2">
+                  <PaperThemeBreakdownTable
+                    themeQuestionCounts={analytics.themeQuestionCounts}
+                    masteryRows={s.correctTagMastery}
+                    title="By theme (this paper)"
+                    correctColumnLabel="Correct / on paper"
+                    scoreMode="perPaper"
+                  />
+                </div>
+              )}
+              <div className="mt-2">
+                <TagStatsChart
+                  rows={sortMasteryRows(s.correctTagMastery)}
+                  emptyMessage="No answers in this slice."
+                  ariaLabel="Bar chart of mastery rate per syllabus theme for one student"
+                />
+              </div>
+            </div>
+          ))}
+          {analytics.students.length === 0 && (
+            <p className="rounded-2xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+              No student submissions yet for this paper.
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }
