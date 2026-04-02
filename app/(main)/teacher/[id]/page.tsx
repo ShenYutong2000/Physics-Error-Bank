@@ -6,7 +6,7 @@ import { apiFetchJson } from "@/lib/api-client";
 import { PaperThemeBreakdownTable } from "@/components/paper-theme-breakdown";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import type { ChoiceOption, PaperThemeCountRow, TagMasteryRow } from "@/lib/paper-types";
-import { PAPER_THEME_LABELS } from "@/lib/paper-themes";
+import { PAPER_THEME_LABELS, paperThemeToUploadToken } from "@/lib/paper-themes";
 
 type MasterySort = "high_to_low" | "low_to_high";
 
@@ -24,6 +24,19 @@ function compareAccuracyLowToHigh(a: number | null | undefined, b: number | null
   if (a == null) return 1;
   if (b == null) return -1;
   return a - b;
+}
+
+type PaperQuestionKeyRow = {
+  number: number;
+  correctAnswer: string;
+  theme: string;
+};
+
+function questionsToTextareaLines(questions: PaperQuestionKeyRow[]): string {
+  if (questions.length === 0) return "";
+  return questions
+    .map((q) => `${q.number},${q.correctAnswer},${paperThemeToUploadToken(q.theme)}`)
+    .join("\n");
 }
 
 type AnalyticsResponse = {
@@ -59,7 +72,10 @@ export default function TeacherPaperDetailPage() {
   const [savingQuestions, setSavingQuestions] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [questionsText, setQuestionsText] = useState("1,A,A\n2,B,B");
+  const [clearSubmissionsBusy, setClearSubmissionsBusy] = useState(false);
+  const [questionsText, setQuestionsText] = useState("");
+  const [answerKeyQuestions, setAnswerKeyQuestions] = useState<PaperQuestionKeyRow[]>([]);
+  const [questionsKeyLoadState, setQuestionsKeyLoadState] = useState<"idle" | "loading" | "ready">("idle");
   const [paperMissing, setPaperMissing] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentListSort, setStudentListSort] = useState<StudentListSort>("name_az");
@@ -74,8 +90,26 @@ export default function TeacherPaperDetailPage() {
     [paperId],
   );
 
+  const refreshQuestionsFromServer = useCallback(async () => {
+    setQuestionsKeyLoadState("loading");
+    const r = await apiFetchJson<{ questions: PaperQuestionKeyRow[] }>(
+      `/api/teacher/papers/${encodeURIComponent(paperId)}/questions`,
+    );
+    if (!r.ok) {
+      setQuestionsKeyLoadState("ready");
+      return;
+    }
+    const qs = r.data.questions ?? [];
+    setAnswerKeyQuestions(qs);
+    setQuestionsText(questionsToTextareaLines(qs));
+    setQuestionsKeyLoadState("ready");
+  }, [paperId]);
+
   useEffect(() => {
     let cancelled = false;
+    setQuestionsText("");
+    setAnswerKeyQuestions([]);
+    setQuestionsKeyLoadState("idle");
     void (async () => {
       const r = await fetchAnalytics();
       if (cancelled) return;
@@ -92,11 +126,12 @@ export default function TeacherPaperDetailPage() {
       setPaperMissing(false);
       setError(null);
       setAnalytics(r.data);
+      await refreshQuestionsFromServer();
     })();
     return () => {
       cancelled = true;
     };
-  }, [paperId, fetchAnalytics]);
+  }, [paperId, fetchAnalytics, refreshQuestionsFromServer]);
 
   async function loadAnalytics() {
     const r = await fetchAnalytics();
@@ -113,6 +148,7 @@ export default function TeacherPaperDetailPage() {
     setPaperMissing(false);
     setError(null);
     setAnalytics(r.data);
+    await refreshQuestionsFromServer();
   }
 
   const parsedQuestions = useMemo(() => {
@@ -215,6 +251,31 @@ export default function TeacherPaperDetailPage() {
     await loadAnalytics();
   }
 
+  async function clearStudentSubmissions() {
+    const label = analytics
+      ? `${analytics.paper.year} ${analytics.paper.session} — ${analytics.paper.title}`
+      : "this paper";
+    if (
+      !window.confirm(
+        `Clear all student submissions for ${label}?\n\nStudents will be able to submit this paper again. Their previous answers and scores for this paper will be removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setClearSubmissionsBusy(true);
+    setError(null);
+    const r = await apiFetchJson<{ ok: true; deletedCount: number }>(
+      `/api/teacher/papers/${encodeURIComponent(paperId)}/clear-submissions`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+    );
+    setClearSubmissionsBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    await loadAnalytics();
+  }
+
   async function deletePaper() {
     const label = analytics
       ? `${analytics.paper.year} ${analytics.paper.session} — ${analytics.paper.title}`
@@ -263,6 +324,10 @@ export default function TeacherPaperDetailPage() {
       <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-2 text-sm font-extrabold text-[var(--duo-text)]">Question upload (one per line)</h2>
         <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">
+          Correct answers and themes load from the server when you open this page (including after publish). Edit below
+          and save to update; the table shows the same saved key.
+        </p>
+        <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">
           Format: <span className="font-mono">questionNumber,correctAnswer,themeCode</span>
           · theme code: <span className="font-mono">A</span>–<span className="font-mono">E</span> or{" "}
           <span className="font-mono">M</span> (Theme M - Measurement and Data Processing). Example:{" "}
@@ -277,6 +342,41 @@ export default function TeacherPaperDetailPage() {
         <p className="mt-1 text-[11px] font-bold text-[var(--duo-text-muted)]">
           Themes: {PAPER_THEME_LABELS.join(" · ")}
         </p>
+        {questionsKeyLoadState === "loading" && (
+          <p className="mt-3 text-xs font-bold text-[var(--duo-text-muted)]">Loading answer key…</p>
+        )}
+        {questionsKeyLoadState === "ready" && answerKeyQuestions.length > 0 && (
+          <div className="mt-3">
+            <h3 className="text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
+              Saved answer key
+            </h3>
+            <div className="mt-2 max-h-56 overflow-auto rounded-xl border-2 border-[var(--duo-border)]">
+              <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
+                <thead>
+                  <tr className="sticky top-0 border-b-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
+                    <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Q#</th>
+                    <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Correct</th>
+                    <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Theme</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {answerKeyQuestions.map((q) => (
+                    <tr key={q.number} className="border-b border-[var(--duo-border)] last:border-b-0">
+                      <td className="px-2 py-1.5 font-bold tabular-nums text-[var(--duo-text)]">{q.number}</td>
+                      <td className="px-2 py-1.5 font-bold tabular-nums text-[var(--duo-text)]">{q.correctAnswer}</td>
+                      <td className="px-2 py-1.5 font-bold text-[var(--duo-text-muted)]">{q.theme}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {questionsKeyLoadState === "ready" && answerKeyQuestions.length === 0 && analytics && (
+          <p className="mt-3 text-xs font-bold text-[var(--duo-text-muted)]">
+            No questions saved yet. Paste or type rows above, then Save questions.
+          </p>
+        )}
         <div className="mt-2 flex gap-2">
           <button
             type="button"
@@ -305,8 +405,20 @@ export default function TeacherPaperDetailPage() {
         </div>
         <button
           type="button"
+          onClick={() => void clearStudentSubmissions()}
+          disabled={clearSubmissionsBusy || deleteBusy || publishBusy || savingQuestions}
+          className="mt-3 w-full rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] py-2.5 text-xs font-extrabold text-[#a60] disabled:opacity-60"
+        >
+          {clearSubmissionsBusy ? "Clearing…" : "Clear student submissions (allow retake)"}
+        </button>
+        <p className="mt-2 text-[11px] font-bold text-[var(--duo-text-muted)]">
+          Removes every student&apos;s answers and scores for this paper only. The paper stays published; students can
+          submit again.
+        </p>
+        <button
+          type="button"
           onClick={() => void deletePaper()}
-          disabled={deleteBusy || publishBusy || savingQuestions}
+          disabled={deleteBusy || clearSubmissionsBusy || publishBusy || savingQuestions}
           className="mt-3 w-full rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] py-2.5 text-xs font-extrabold text-[#c00] disabled:opacity-60"
         >
           {deleteBusy ? "Deleting..." : "Delete paper"}

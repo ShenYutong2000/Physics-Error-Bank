@@ -25,6 +25,15 @@ export function canonicalizePaperThemeLabel(theme: string): string {
   return t;
 }
 
+/** Map stored full theme label back to upload code (A–E, M) for teacher CSV lines. */
+export function paperThemeToUploadToken(theme: string): string {
+  const canonical = canonicalizePaperThemeLabel(theme);
+  for (const [code, label] of Object.entries(THEME_CODE_TO_LABEL)) {
+    if (label === canonical) return code;
+  }
+  return canonical;
+}
+
 export function normalizePaperTheme(raw: string): string {
   const t = raw.trim();
   if (!t) {
