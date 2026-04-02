@@ -7,10 +7,30 @@ const studentItems = [
   { href: "/add", label: "Add", icon: CameraIcon },
   { href: "/library", label: "Library", icon: BooksIcon },
   { href: "/papers", label: "Papers", icon: ClipboardIcon },
+  { href: "/papers/overview", label: "Stats", icon: ChartIcon },
 ] as const;
+
+function isStudentNavItemActive(pathname: string, href: string): boolean {
+  if (href === "/papers/overview") {
+    return pathname === "/papers/overview";
+  }
+  if (href === "/papers") {
+    if (pathname === "/papers") return true;
+    if (pathname.startsWith("/papers/") && !pathname.startsWith("/papers/overview")) return true;
+    return false;
+  }
+  if (href === "/add") {
+    return pathname === "/add" || pathname.startsWith("/add/");
+  }
+  if (href === "/library") {
+    return pathname === "/library" || pathname.startsWith("/library/");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 const teacherItems = [
   { href: "/teacher", label: "Teacher", icon: ChartIcon },
+  { href: "/teacher/papers-overview", label: "Stats", icon: ClipboardIcon },
   { href: "/teacher/mistakes", label: "Class", icon: UsersIcon },
 ] as const;
 
@@ -20,9 +40,12 @@ function pathMatchesBase(pathname: string, base: string): boolean {
 
 function isTeacherNavItemActive(pathname: string, href: string): boolean {
   if (href === "/teacher/mistakes") return pathMatchesBase(pathname, "/teacher/mistakes");
+  if (href === "/teacher/papers-overview") return pathMatchesBase(pathname, "/teacher/papers-overview");
   if (href === "/teacher") {
     return (
-      pathMatchesBase(pathname, "/teacher") && !pathMatchesBase(pathname, "/teacher/mistakes")
+      pathMatchesBase(pathname, "/teacher") &&
+      !pathMatchesBase(pathname, "/teacher/mistakes") &&
+      !pathMatchesBase(pathname, "/teacher/papers-overview")
     );
   }
   return false;
@@ -37,16 +60,16 @@ export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
       className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_0_rgba(0,0,0,0.06)]"
       aria-label="Main navigation"
     >
-      <div className="mx-auto flex max-w-lg justify-around px-2">
+      <div className="mx-auto flex max-w-lg justify-around gap-0 px-1 sm:px-2">
         {items.map(({ href, label, icon: Icon }) => {
           const active = isTeacher
             ? isTeacherNavItemActive(pathname, href)
-            : pathname === href || (href !== "/add" && href !== "/library" && pathname.startsWith(`${href}/`));
+            : isStudentNavItemActive(pathname, href);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex min-w-[4.5rem] flex-col items-center gap-1 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+              className={`flex min-w-0 max-w-[5.5rem] flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-xs font-bold transition-colors sm:min-w-[4.25rem] sm:px-2 sm:text-sm ${
                 active
                   ? "text-[var(--duo-green-dark)]"
                   : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"

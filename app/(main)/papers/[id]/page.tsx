@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
@@ -228,6 +229,20 @@ export default function PaperAttemptPage() {
 
       {result && (
         <section className="mt-6 space-y-4">
+          <Link
+            href="/papers/overview"
+            className="block rounded-2xl border-b-[6px] border-[var(--duo-green-shadow)] bg-gradient-to-br from-[#58cc02] to-[#43a004] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
+          >
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">Next step</p>
+            <p className="mt-1 text-lg font-black leading-snug">View stats for all published papers</p>
+            <p className="mt-1 text-sm font-bold text-white/90">
+              Class question rates and your theme mastery across every paper.
+            </p>
+            <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#3d9400]">
+              Open paper overview →
+            </span>
+          </Link>
+
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <p className="text-lg font-extrabold text-[var(--duo-text)]">
               Score: {result.correctCount}/{result.correctCount + result.wrongCount} ({result.accuracy}%)

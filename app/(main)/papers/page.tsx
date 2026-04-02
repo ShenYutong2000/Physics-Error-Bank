@@ -25,6 +25,30 @@ export default function PapersPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+      <Link
+        href="/papers/overview"
+        className="mb-6 block rounded-2xl border-b-[6px] border-[var(--duo-green-shadow)] bg-gradient-to-br from-[#58cc02] to-[#43a004] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
+      >
+        <div className="flex items-start gap-3">
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 border-white/30 bg-white/20 text-2xl"
+            aria-hidden
+          >
+            📊
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">Paper stats & mastery</p>
+            <p className="mt-1 text-lg font-black leading-snug">See all papers at a glance</p>
+            <p className="mt-1 text-sm font-bold text-white/90">
+              Class question rates + your theme mastery across every published paper.
+            </p>
+          </div>
+        </div>
+        <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#3d9400] shadow-inner">
+          Open overview →
+        </span>
+      </Link>
+
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">Past papers</p>
         <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Choose a paper</h1>
