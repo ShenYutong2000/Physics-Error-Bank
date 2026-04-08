@@ -14,6 +14,7 @@
     "db:clear-all": "tsx scripts/clear-all-accounts.ts",
     "db:clear-papers": "tsx scripts/clear-all-papers.ts",
     "teacher:add": "tsx scripts/add-teacher-email.ts",
+    "branding:apple-cutout": "tsx scripts/cutout-apple-logo.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "prisma": "^6.19.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

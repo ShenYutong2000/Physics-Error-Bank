@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { DEFAULT_PAPER_QUESTION_COUNT, type ExamSession, type PaperSummary } from "@/lib/paper-types";
 
 export default function TeacherHomePage() {
@@ -87,7 +88,7 @@ export default function TeacherHomePage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <header className="mb-5">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
         <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Shared paper bank</h1>

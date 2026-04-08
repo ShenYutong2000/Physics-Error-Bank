@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { apiFetchJson } from "@/lib/api-client";
 import type { StudentMistakeAnalyticsRow } from "@/lib/teacher-mistake-analytics";
@@ -82,7 +83,7 @@ export default function TeacherMistakesAnalyticsPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <header className="mb-5">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
         <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Class mistake analytics</h1>
@@ -105,18 +106,16 @@ export default function TeacherMistakesAnalyticsPage() {
 
       {data && (
         <>
-          <section className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+          <section className="mb-6 rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">All students</h2>
-            <div className="mb-4 flex flex-wrap gap-4 text-sm font-bold">
-              <div>
-                <span className="text-[var(--duo-text-muted)]">Total mistakes </span>
-                <span className="tabular-nums text-[var(--duo-text)]">{data.overall.totalMistakes}</span>
+            <div className="mb-4 grid grid-cols-1 gap-3 text-sm font-bold sm:grid-cols-2">
+              <div className="rounded-xl border-2 border-[#ffd8a8] bg-[#fff4e5] px-3 py-2">
+                <span className="text-[#a65b00]">Total mistakes </span>
+                <span className="tabular-nums text-[#7a3f00]">{data.overall.totalMistakes}</span>
               </div>
-              <div>
-                <span className="text-[var(--duo-text-muted)]">Students with mistakes </span>
-                <span className="tabular-nums text-[var(--duo-text)]">
-                  {data.overall.studentCountWithMistakes}
-                </span>
+              <div className="rounded-xl border-2 border-[#b6d4fe] bg-[#e8f3ff] px-3 py-2">
+                <span className="text-[#1c6ed6]">Students with mistakes </span>
+                <span className="tabular-nums text-[#174ea6]">{data.overall.studentCountWithMistakes}</span>
               </div>
             </div>
             <h3 className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
@@ -130,7 +129,7 @@ export default function TeacherMistakesAnalyticsPage() {
           </section>
 
           <section aria-label="Student mistake lists">
-            <div className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <div className="mb-4 rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
               <h2 className="text-sm font-extrabold text-[var(--duo-text)]">By student</h2>
               <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">
                 Search by display name or email. Sort by name or mistake count.
@@ -143,7 +142,7 @@ export default function TeacherMistakesAnalyticsPage() {
                   onChange={(e) => setStudentSearch(e.target.value)}
                   placeholder="Search name or email…"
                   autoComplete="off"
-                  className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2.5 text-sm font-bold placeholder:text-[var(--duo-text-muted)]"
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#f4f9ff] px-3 py-2.5 text-sm font-bold placeholder:text-[#7a8a9a]"
                   aria-label="Filter students by name or email"
                 />
               </label>
@@ -152,7 +151,7 @@ export default function TeacherMistakesAnalyticsPage() {
                 <select
                   value={studentListSort}
                   onChange={(e) => setStudentListSort(e.target.value as StudentListSort)}
-                  className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#f4f9ff] px-3 py-2 text-sm font-bold"
                   aria-label="Sort students by name or mistake count"
                 >
                   <option value="name_az">Name (A–Z)</option>
@@ -180,7 +179,7 @@ export default function TeacherMistakesAnalyticsPage() {
                 return (
                   <div
                     key={s.userId}
-                    className="overflow-hidden rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+                    className="overflow-hidden rounded-2xl border-2 border-[#d9e3f0] bg-gradient-to-br from-white to-[#fafcff] shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
                   >
                     <button
                       type="button"
@@ -195,7 +194,7 @@ export default function TeacherMistakesAnalyticsPage() {
                       </span>
                     </button>
                     {open && (
-                      <div className="border-t-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-3">
+                      <div className="border-t-2 border-[#d9e3f0] bg-[#f5f8ff] px-4 py-3">
                         <p className="mb-2 truncate text-xs font-bold text-[var(--duo-text-muted)]">{s.email}</p>
                         <TagStatsChart
                           rows={s.tagRows}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -101,23 +102,39 @@ export function LoginScreen({ showDevHint }: Props) {
       <div className="login-blob login-blob--a" aria-hidden />
       <div className="login-blob login-blob--b" aria-hidden />
       <div className="login-blob login-blob--c" aria-hidden />
+      <div className="login-stars" aria-hidden>
+        <div className="login-star login-star--a" />
+        <div className="login-star login-star--b" />
+        <div className="login-star login-star--c" />
+        <div className="login-star login-star--d" />
+        <div className="login-orbit login-orbit--a" />
+        <div className="login-orbit login-orbit--b" />
+      </div>
 
       <div className="relative z-10 mx-auto flex max-w-md flex-col items-center">
         <div className="mb-6 flex flex-col items-center">
-          <LoginMascot className="h-36 w-36 drop-shadow-lg sm:h-44 sm:w-44" />
-          <h1 className="mt-4 text-center text-3xl font-black tracking-tight text-[var(--duo-text)] sm:text-4xl">
-            {mode === "login" ? "Hi there!" : "Join the nest!"}
+          <Image
+            src="/branding/apple-logo-icon.png"
+            alt="Spark apple mascot"
+            width={280}
+            height={280}
+            unoptimized
+            className="h-48 w-48 max-w-[min(100%,280px)] object-contain [filter:drop-shadow(0_12px_28px_rgba(200,80,90,0.2))_drop-shadow(0_6px_22px_rgba(255,210,120,0.45))] sm:h-56 sm:w-56"
+            priority
+          />
+          <h1 className="mt-5 text-center text-[2rem] font-black leading-tight tracking-tight text-[#14224d] drop-shadow-[0_2px_0_rgba(255,255,255,0.45)] sm:text-5xl sm:leading-tight">
+            {mode === "login" ? "Welcome back!" : "Create your space"}
           </h1>
-          <p className="mt-2 max-w-sm text-center text-base font-bold text-[var(--duo-text-muted)]">
+          <p className="mt-3 max-w-sm text-center text-lg font-black leading-snug text-[#2f3f72] sm:text-xl">
             {mode === "login"
               ? "Log in with your UWC China school email to save mistakes and review your library."
               : `Sign up with your school email (${STUDENT_EMAIL_DOMAIN}) to create your error bank.`}
           </p>
         </div>
 
-        <div className="w-full rounded-[1.75rem] border-4 border-white bg-white/95 p-6 shadow-[0_8px_0_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-8">
+        <div className="w-full rounded-[1.75rem] border-4 border-[#edf2ff] bg-white/95 p-6 shadow-[0_8px_0_rgba(45,60,120,0.12)] backdrop-blur-sm sm:p-8">
           <div
-            className="mb-6 flex rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafafa] p-1"
+            className="mb-6 flex rounded-2xl border-2 border-[#d7e1ff] bg-[#f7f9ff] p-1"
             role="tablist"
             aria-label="Log in or sign up"
           >
@@ -128,7 +145,7 @@ export function LoginScreen({ showDevHint }: Props) {
               onClick={() => switchMode("login")}
               className={`flex-1 rounded-xl py-3 text-sm font-extrabold transition-colors ${
                 mode === "login"
-                  ? "border-b-4 border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                  ? "border-b-4 border-[#a93d57] bg-[#d95a75] text-white"
                   : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
               }`}
             >
@@ -141,7 +158,7 @@ export function LoginScreen({ showDevHint }: Props) {
               onClick={() => switchMode("register")}
               className={`flex-1 rounded-xl py-3 text-sm font-extrabold transition-colors ${
                 mode === "register"
-                  ? "border-b-4 border-[var(--duo-blue-shadow)] bg-[var(--duo-blue)] text-white"
+                  ? "border-b-4 border-[#3d54c5] bg-[#5e75ef] text-white"
                   : "text-[var(--duo-text-muted)] hover:text-[var(--duo-text)]"
               }`}
             >
@@ -155,7 +172,7 @@ export function LoginScreen({ showDevHint }: Props) {
                 <>
                   <label
                     htmlFor="auth-name"
-                    className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                    className="mb-1.5 block text-sm font-black text-[#253262]"
                   >
                     Name
                   </label>
@@ -173,7 +190,7 @@ export function LoginScreen({ showDevHint }: Props) {
               )}
               <label
                 htmlFor="auth-email"
-                className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                className="mb-1.5 block text-sm font-black text-[#253262]"
               >
                 School email
               </label>
@@ -195,7 +212,7 @@ export function LoginScreen({ showDevHint }: Props) {
             <div>
               <label
                 htmlFor="auth-password"
-                className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                className="mb-1.5 block text-sm font-black text-[#253262]"
               >
                 Password
               </label>
@@ -232,7 +249,7 @@ export function LoginScreen({ showDevHint }: Props) {
               <div>
                 <label
                   htmlFor="auth-confirm"
-                  className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                  className="mb-1.5 block text-sm font-black text-[#253262]"
                 >
                   Confirm password
                 </label>
@@ -251,8 +268,8 @@ export function LoginScreen({ showDevHint }: Props) {
             )}
 
             {mode === "register" && (
-              <div className="space-y-4 rounded-2xl border-2 border-[var(--duo-border)] bg-[#fafff5] p-4">
-                <p className="text-sm font-extrabold text-[var(--duo-text)]">Security questions</p>
+              <div className="space-y-4 rounded-2xl border-2 border-[#f2d3dc] bg-[#fff8fb] p-4">
+                <p className="text-sm font-black text-[#253262]">Security questions</p>
                 <p className="text-xs font-bold leading-relaxed text-[var(--duo-text-muted)]">
                   Pick answers you will remember. Avoid personal names, phone numbers, or addresses. You
                   will need the same answers if you forget your password.
@@ -261,7 +278,7 @@ export function LoginScreen({ showDevHint }: Props) {
                   <div key={i}>
                     <label
                       htmlFor={`auth-recovery-${i}`}
-                      className="mb-1.5 block text-sm font-extrabold text-[var(--duo-text)]"
+                      className="mb-1.5 block text-sm font-black text-[#253262]"
                     >
                       {RECOVERY_QUESTIONS[i]}
                     </label>
@@ -308,8 +325,8 @@ export function LoginScreen({ showDevHint }: Props) {
           {showDevHint && (
             <p className="mt-4 text-center text-xs font-bold text-[var(--duo-text-muted)]">
               Dev-only bootstrap login:{" "}
-              <span className="text-[var(--duo-green-dark)]">student@example.com</span> /{" "}
-              <span className="text-[var(--duo-green-dark)]">physics123</span>
+              <span className="text-[#d95a75]">student@example.com</span> /{" "}
+              <span className="text-[#d95a75]">physics123</span>
               <br />
               <span className="mt-1 inline-block">
                 Sign up always requires {STUDENT_EMAIL_DOMAIN}. Set AUTH_EMAIL in .env to use another
@@ -319,56 +336,10 @@ export function LoginScreen({ showDevHint }: Props) {
           )}
         </div>
 
-        <p className="mt-8 text-center text-sm font-bold text-white/90 drop-shadow-sm">
+        <p className="mt-8 text-center text-sm font-bold text-[#f7f9ff] drop-shadow-sm">
           Physics Error Bank — learn smarter, one mistake at a time.
         </p>
       </div>
     </div>
-  );
-}
-
-function LoginMascot({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 200 200"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <ellipse cx="100" cy="175" rx="70" ry="18" fill="#3FAE2A" opacity="0.35" />
-      <path
-        d="M100 28c-38 0-62 28-62 62 0 48 28 72 62 72s62-24 62-72c0-34-24-62-62-62z"
-        fill="#58CC02"
-        stroke="#389202"
-        strokeWidth="4"
-      />
-      <path
-        d="M52 78c-18-8-28-22-28-38 0-20 16-36 36-36 10 0 20 4 28 12-8 18-20 34-36 62z"
-        fill="#89E219"
-        stroke="#5CAD0A"
-        strokeWidth="3"
-      />
-      <path
-        d="M148 78c18-8 28-22 28-38 0-20-16-36-36-36-10 0-20 4-28 12 8 18 20 34 36 62z"
-        fill="#89E219"
-        stroke="#5CAD0A"
-        strokeWidth="3"
-      />
-      <ellipse cx="78" cy="88" rx="22" ry="26" fill="white" stroke="#389202" strokeWidth="3" />
-      <ellipse cx="122" cy="88" rx="22" ry="26" fill="white" stroke="#389202" strokeWidth="3" />
-      <circle cx="82" cy="90" r="10" fill="#3C3C3C" />
-      <circle cx="118" cy="90" r="10" fill="#3C3C3C" />
-      <circle cx="85" cy="87" r="3" fill="white" />
-      <circle cx="121" cy="87" r="3" fill="white" />
-      <path
-        d="M88 118c8 10 16 10 24 0"
-        stroke="#389202"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-      <rect x="72" y="132" width="56" height="36" rx="10" fill="#1CB0F6" stroke="#0E8EC4" strokeWidth="3" />
-      <path d="M88 150h24M100 142v16" stroke="white" strokeWidth="3" strokeLinecap="round" />
-    </svg>
   );
 }

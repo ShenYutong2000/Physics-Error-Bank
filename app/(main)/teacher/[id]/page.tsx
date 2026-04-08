@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { apiFetchJson } from "@/lib/api-client";
 import { PaperThemeBreakdownTable } from "@/components/paper-theme-breakdown";
 import { TagStatsChart } from "@/components/tag-stats-chart";
@@ -299,8 +300,8 @@ export default function TeacherPaperDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
-      <header className="mb-4">
+    <div className={mainPageClassName}>
+      <header className="mb-4 rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-5 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher analytics</p>
         <h1 className="text-xl font-extrabold text-[var(--duo-text)]">
           {analytics ? `${analytics.paper.year} ${analytics.paper.session}` : "Loading..."}
@@ -321,7 +322,7 @@ export default function TeacherPaperDetailPage() {
           )}
         </div>
       )}
-      <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="mb-4 rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <h2 className="mb-2 text-sm font-extrabold text-[var(--duo-text)]">Question upload (one per line)</h2>
         <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">
           Correct answers and themes load from the server when you open this page (including after publish). Edit below
@@ -337,7 +338,7 @@ export default function TeacherPaperDetailPage() {
           rows={6}
           value={questionsText}
           onChange={(e) => setQuestionsText(e.target.value)}
-          className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] p-3 text-xs font-bold"
+          className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#f4f9ff] p-3 text-xs font-bold"
         />
         <p className="mt-1 text-[11px] font-bold text-[var(--duo-text-muted)]">
           Themes: {PAPER_THEME_LABELS.join(" · ")}
@@ -350,10 +351,10 @@ export default function TeacherPaperDetailPage() {
             <h3 className="text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
               Saved answer key
             </h3>
-            <div className="mt-2 max-h-56 overflow-auto rounded-xl border-2 border-[var(--duo-border)]">
+            <div className="mt-2 max-h-56 overflow-auto rounded-xl border-2 border-[#d9e3f0]">
               <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
                 <thead>
-                  <tr className="sticky top-0 border-b-2 border-[var(--duo-border)] bg-[var(--duo-surface)]">
+                  <tr className="sticky top-0 border-b-2 border-[#d9e3f0] bg-[#f5f8ff]">
                     <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Q#</th>
                     <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Correct</th>
                     <th className="px-2 py-2 font-extrabold text-[var(--duo-text)]">Theme</th>
@@ -361,7 +362,7 @@ export default function TeacherPaperDetailPage() {
                 </thead>
                 <tbody>
                   {answerKeyQuestions.map((q) => (
-                    <tr key={q.number} className="border-b border-[var(--duo-border)] last:border-b-0">
+                    <tr key={q.number} className="border-b border-[#e7edf5] last:border-b-0">
                       <td className="px-2 py-1.5 font-bold tabular-nums text-[var(--duo-text)]">{q.number}</td>
                       <td className="px-2 py-1.5 font-bold tabular-nums text-[var(--duo-text)]">{q.correctAnswer}</td>
                       <td className="px-2 py-1.5 font-bold text-[var(--duo-text-muted)]">{q.theme}</td>
@@ -390,7 +391,7 @@ export default function TeacherPaperDetailPage() {
             type="button"
             onClick={() => void setPublish(true)}
             disabled={publishBusy}
-            className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2 text-xs font-extrabold"
+            className="flex-1 rounded-xl border-2 border-[#b6d4fe] bg-[#e8f3ff] py-2 text-xs font-extrabold text-[#1c6ed6]"
           >
             Publish
           </button>
@@ -398,7 +399,7 @@ export default function TeacherPaperDetailPage() {
             type="button"
             onClick={() => void setPublish(false)}
             disabled={publishBusy}
-            className="flex-1 rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] py-2 text-xs font-extrabold"
+            className="flex-1 rounded-xl border-2 border-[#b6d4fe] bg-[#e8f3ff] py-2 text-xs font-extrabold text-[#1c6ed6]"
           >
             Unpublish
           </button>
@@ -429,7 +430,7 @@ export default function TeacherPaperDetailPage() {
         </p>
       </section>
       {analytics && analytics.themeQuestionCounts.length > 0 && (
-        <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        <section className="mb-4 rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <PaperThemeBreakdownTable
             themeQuestionCounts={analytics.themeQuestionCounts}
             masteryRows={analytics.overall.correctTagMastery}
@@ -440,14 +441,14 @@ export default function TeacherPaperDetailPage() {
           />
         </section>
       )}
-      <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section className="mb-4 rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Overall theme mastery (correct rate)</h2>
           <div className="flex gap-2">
             <select
               value={masterySort}
               onChange={(e) => setMasterySort(e.target.value as MasterySort)}
-              className="rounded-lg border-2 border-[var(--duo-border)] px-2 py-1 text-xs font-bold"
+              className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
               aria-label="Sort mastery chart rows"
             >
               <option value="high_to_low">Mastery: High to low</option>
@@ -464,7 +465,7 @@ export default function TeacherPaperDetailPage() {
       </section>
       {analytics && (
         <section className="space-y-3" aria-label="Student submissions">
-          <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+          <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Student submissions</h2>
             <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">
               Search by display name or email to find a student quickly.
@@ -477,7 +478,7 @@ export default function TeacherPaperDetailPage() {
                 onChange={(e) => setStudentSearch(e.target.value)}
                 placeholder="Search name or email…"
                 autoComplete="off"
-                className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2.5 text-sm font-bold placeholder:text-[var(--duo-text-muted)]"
+                className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#f4f9ff] px-3 py-2.5 text-sm font-bold placeholder:text-[#7a8a9a]"
                 aria-label="Filter students by name or email"
               />
             </label>
@@ -486,7 +487,7 @@ export default function TeacherPaperDetailPage() {
               <select
                 value={studentListSort}
                 onChange={(e) => setStudentListSort(e.target.value as StudentListSort)}
-                className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+                className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#f4f9ff] px-3 py-2 text-sm font-bold"
                 aria-label="Sort students by name or accuracy"
               >
                 <option value="name_az">Name (A–Z)</option>
@@ -509,12 +510,12 @@ export default function TeacherPaperDetailPage() {
           {displayedStudents.map((s) => (
             <div
               key={s.userId}
-              className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+              className="rounded-2xl border-2 border-[#d9e3f0] bg-gradient-to-br from-white to-[#fafcff] p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-extrabold text-[var(--duo-text)]">{s.name || "(Unnamed)"}</p>
                 {s.latestAccuracy != null && (
-                  <span className="shrink-0 rounded-lg border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-2 py-0.5 text-xs font-extrabold tabular-nums text-[var(--duo-green-dark)]">
+                  <span className="shrink-0 rounded-lg border-2 border-[#b6d4fe] bg-[#e8f3ff] px-2 py-0.5 text-xs font-extrabold tabular-nums text-[#1c6ed6]">
                     {s.latestAccuracy}%
                   </span>
                 )}

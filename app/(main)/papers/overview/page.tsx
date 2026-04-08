@@ -1,8 +1,9 @@
+import { mainPageClassName } from "@/components/main-page-layout";
 import { PaperStatsOverviewPanel } from "@/components/paper-stats-overview";
 
 export default function PapersOverviewPage() {
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <header className="mb-6 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
         <div className="flex items-start gap-3">
           <span

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { useMistakes } from "@/components/mistakes-provider";
 import { NoticeBanner } from "@/components/notice-banner";
 import { RetryableImage } from "@/components/retryable-image";
@@ -373,7 +374,7 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       {loadError && (
         <NoticeBanner
           tone="warning"
@@ -666,7 +667,7 @@ export default function LibraryPage() {
                   {m.tags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-lg bg-[#eef7e8] px-2 py-0.5 text-xs font-bold text-[var(--duo-green-dark)]"
+                      className="rounded-lg bg-[#ecebff] px-2 py-0.5 text-xs font-bold text-[var(--duo-green-dark)]"
                     >
                       {renderHighlightedText(t, search)}
                     </span>
@@ -752,7 +753,7 @@ export default function LibraryPage() {
           aria-labelledby="detail-title"
           onClick={(e) => e.target === e.currentTarget && closeDetail()}
         >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border-2 border-[var(--duo-border)] bg-white shadow-xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b-2 border-[var(--duo-border)] bg-white px-4 py-3">
               <h2 id="detail-title" className="text-lg font-extrabold text-[var(--duo-text)]">
                 Mistake details
@@ -825,7 +826,7 @@ export default function LibraryPage() {
                     {detail.tags.map((t) => (
                       <span
                         key={t}
-                        className="rounded-lg bg-[#eef7e8] px-2 py-1 text-sm font-bold text-[var(--duo-green-dark)]"
+                        className="rounded-lg bg-[#ecebff] px-2 py-1 text-sm font-bold text-[var(--duo-green-dark)]"
                       >
                         {t}
                       </span>
