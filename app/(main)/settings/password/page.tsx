@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth-validation";
 
 export default function ChangePasswordPage() {
@@ -44,7 +45,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <header className="mb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-green-dark)]">
           Account
@@ -111,7 +112,7 @@ export default function ChangePasswordPage() {
           </p>
         )}
         {success && (
-          <p className="mb-4 rounded-xl border-2 border-[var(--duo-green-shadow)] bg-[#e8f7e0] px-3 py-2 text-sm font-bold text-[var(--duo-green-dark)]">
+          <p className="mb-4 rounded-xl border-2 border-[#7a84ff] bg-[#ecebff] px-3 py-2 text-sm font-bold text-[#3f4fcf]">
             Password updated. You can keep using this session; next login, use your new password.
           </p>
         )}

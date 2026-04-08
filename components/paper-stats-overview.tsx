@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import type { PublishedPaperStatsRow, TagMasteryRow } from "@/lib/paper-types";
@@ -60,7 +61,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   return (
     <div className="space-y-6">
       {variant === "teacher" && (
-        <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <label className="mb-2 block text-sm font-extrabold text-[var(--duo-text)]" htmlFor="paper-stats-student">
             Theme mastery scope
           </label>
@@ -85,7 +86,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               </option>
             ))}
           </select>
-          <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
+          <p className="mt-2 text-xs font-bold text-[#5c6b7a]">
             Question statistics below always include all students who submitted. Theme bars follow your selection.
           </p>
         </div>
@@ -102,7 +103,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
 
       {data && !loading && (
         <>
-          <section className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+          <section className="rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">
               {masteryHeading(
                 data.masteryScope,
@@ -134,7 +135,12 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               </p>
             )}
             {data.papers.map((row) => (
-              <PaperQuestionBlock key={row.paper.id} row={row} />
+              <PaperQuestionBlock
+                key={row.paper.id}
+                row={row}
+                showTeacherDetailLink={variant === "teacher"}
+                showStudentDetailLink={variant === "student"}
+              />
             ))}
           </section>
         </>
@@ -143,10 +149,18 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   );
 }
 
-function PaperQuestionBlock({ row }: { row: PublishedPaperStatsRow }) {
+function PaperQuestionBlock({
+  row,
+  showTeacherDetailLink,
+  showStudentDetailLink,
+}: {
+  row: PublishedPaperStatsRow;
+  showTeacherDetailLink: boolean;
+  showStudentDetailLink: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+    <div className="rounded-2xl border-2 border-[#e2e8f0] bg-gradient-to-br from-white to-[#fafcff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -163,12 +177,28 @@ function PaperQuestionBlock({ row }: { row: PublishedPaperStatsRow }) {
       <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
         Submissions: {row.attemptCount} · Avg score: {row.attemptCount > 0 ? `${row.averageAccuracy}%` : "—"}
       </p>
+      {showTeacherDetailLink && (
+        <Link
+          href={`/teacher/${row.paper.id}`}
+          className="mt-3 inline-flex rounded-lg border-2 border-[#b6d4fe] bg-[#e8f3ff] px-3 py-1.5 text-xs font-extrabold text-[#1c6ed6] transition-colors hover:bg-[#ddecff]"
+        >
+          View detailed stats →
+        </Link>
+      )}
+      {showStudentDetailLink && (
+        <Link
+          href={`/papers/${row.paper.id}`}
+          className="mt-3 inline-flex rounded-lg border-2 border-[#b6d4fe] bg-[#e8f3ff] px-3 py-1.5 text-xs font-extrabold text-[#1c6ed6] transition-colors hover:bg-[#ddecff]"
+        >
+          View this paper details →
+        </Link>
+      )}
       {open && (
         <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
           {row.questions.map((q) => (
             <li
               key={q.questionNumber}
-              className="flex items-center justify-between gap-2 rounded-lg bg-[var(--duo-surface)] px-2 py-1.5 text-xs font-bold"
+              className="flex items-center justify-between gap-2 rounded-lg bg-[#f3f7ff] px-2 py-1.5 text-xs font-bold"
             >
               <span className="text-[var(--duo-text)]">Q{q.questionNumber}</span>
               <span className="tabular-nums text-[var(--duo-text-muted)]">

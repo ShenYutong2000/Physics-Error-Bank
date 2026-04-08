@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { mainPageClassName } from "@/components/main-page-layout";
 import type { PaperSummary } from "@/lib/paper-types";
 
 export default function PapersPage() {
@@ -24,10 +25,10 @@ export default function PapersPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <Link
         href="/papers/overview"
-        className="mb-6 block rounded-2xl border-b-[6px] border-[var(--duo-green-shadow)] bg-gradient-to-br from-[#58cc02] to-[#43a004] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
+        className="mb-6 block rounded-2xl border-b-[6px] border-[#4a56c7] bg-gradient-to-br from-[#7a84ff] via-[#8b5cf6] to-[#3ecbff] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
       >
         <div className="flex items-start gap-3">
           <span
@@ -44,7 +45,7 @@ export default function PapersPage() {
             </p>
           </div>
         </div>
-        <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#3d9400] shadow-inner">
+        <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#4454c8] shadow-inner">
           Open overview →
         </span>
       </Link>

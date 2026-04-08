@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMistakes } from "@/components/mistakes-provider";
 import { compressImageForUpload } from "@/lib/image-compress";
 import { rotateImageFile } from "@/lib/image-edit";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { TAG_GROUPS } from "@/lib/types";
 
 export default function AddMistakePage() {
@@ -139,7 +140,7 @@ export default function AddMistakePage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       {loadError && (
         <p className="mb-4 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-bold text-[#a60]">
           {loadError}
@@ -256,7 +257,7 @@ export default function AddMistakePage() {
                       className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition-colors ${
                         on
                           ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                          : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#eef7e8]"
+                          : "border-[var(--duo-border)] bg-[var(--duo-surface)] text-[var(--duo-text)] hover:bg-[#ecebff]"
                       }`}
                     >
                       {t}
@@ -286,19 +287,19 @@ export default function AddMistakePage() {
         </p>
       )}
       {saveSuccess && (
-        <div className="mb-4 rounded-xl border-2 border-[#58cc02] bg-[#ebf9de] px-3 py-2 text-sm font-bold text-[#2d7a00]">
+        <div className="mb-4 rounded-xl border-2 border-[#7a84ff] bg-[#ecebff] px-3 py-2 text-sm font-bold text-[#3f4fcf]">
           Saved successfully.
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg border-2 border-[#58cc02] bg-white px-3 py-1 text-xs font-bold text-[#2d7a00]"
+              className="rounded-lg border-2 border-[#7a84ff] bg-white px-3 py-1 text-xs font-bold text-[#3f4fcf]"
             >
               Continue adding next
             </button>
             <Link
               href="/library"
-              className="rounded-lg border-2 border-[#9fd97a] bg-[#f7fff1] px-3 py-1 text-xs font-bold text-[#2d7a00]"
+              className="rounded-lg border-2 border-[#bfc4ff] bg-[#f6f6ff] px-3 py-1 text-xs font-bold text-[#3f4fcf]"
             >
               View library
             </Link>

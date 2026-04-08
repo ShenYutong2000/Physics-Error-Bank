@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 const studentItems = [
@@ -51,16 +52,77 @@ function isTeacherNavItemActive(pathname: string, href: string): boolean {
   return false;
 }
 
+export function DuoDesktopSidebar({ isTeacher }: { isTeacher: boolean }) {
+  const pathname = usePathname();
+  const items = isTeacher ? teacherItems : studentItems;
+
+  return (
+    <aside
+      className="hidden w-[15rem] shrink-0 flex-col border-r-2 border-[var(--duo-border)] bg-[#f8faff] lg:sticky lg:top-0 lg:flex lg:h-screen lg:overflow-y-auto"
+      aria-label="Main navigation"
+    >
+      <div className="flex items-center gap-2 border-b-2 border-[var(--duo-border)] px-4 py-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center" aria-hidden>
+          <PlanetBrandIcon />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-[var(--duo-green-dark)]">
+            Physics Error Bank
+          </p>
+          <p className="truncate text-sm font-black leading-tight text-[var(--duo-text)]">
+            {isTeacher ? "Teacher" : "Student"}
+          </p>
+        </div>
+      </div>
+      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+        {items.map(({ href, label, icon: Icon }) => {
+          const active = isTeacher
+            ? isTeacherNavItemActive(pathname, href)
+            : isStudentNavItemActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold transition-colors ${
+                active
+                  ? "bg-[#ecebff] text-[var(--duo-green-dark)]"
+                  : "text-[var(--duo-text-muted)] hover:bg-[var(--duo-surface)] hover:text-[var(--duo-text)]"
+              }`}
+            >
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-4 transition-transform active:translate-y-0.5 active:border-b-2 ${
+                  active
+                    ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
+                    : "border-[#dbe3ff] bg-[var(--duo-surface)] text-[var(--duo-text-muted)]"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function PlanetBrandIcon() {
+  return (
+    <Image src="/branding/planet-logo.png" alt="" width={28} height={28} className="h-10 w-10 object-contain" />
+  );
+}
+
 export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
   const pathname = usePathname();
   const items = isTeacher ? teacherItems : studentItems;
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_0_rgba(0,0,0,0.06)]"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[var(--duo-border)] bg-[#f8faff] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_0_rgba(0,0,0,0.06)] lg:hidden"
       aria-label="Main navigation"
     >
-      <div className="mx-auto flex max-w-lg justify-around gap-0 px-1 sm:px-2">
+      <div className="mx-auto flex max-w-7xl justify-around gap-0 px-1 sm:px-2">
         {items.map(({ href, label, icon: Icon }) => {
           const active = isTeacher
             ? isTeacherNavItemActive(pathname, href)
@@ -79,7 +141,7 @@ export function DuoNav({ isTeacher }: { isTeacher: boolean }) {
                 className={`flex h-10 w-10 items-center justify-center rounded-2xl border-b-4 transition-transform active:translate-y-0.5 active:border-b-2 ${
                   active
                     ? "border-[var(--duo-green-shadow)] bg-[var(--duo-green)] text-white"
-                    : "border-[#e5e5e5] bg-[var(--duo-surface)] text-[var(--duo-text-muted)]"
+                    : "border-[#dbe3ff] bg-[var(--duo-surface)] text-[var(--duo-text-muted)]"
                 }`}
               >
                 <Icon className="h-5 w-5" />

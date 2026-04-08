@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import { PaperThemeBreakdownTable } from "@/components/paper-theme-breakdown";
+import { mainPageClassName } from "@/components/main-page-layout";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import type { ChoiceOption, PaperSummary, PaperThemeCountRow, TagMasteryRow } from "@/lib/paper-types";
 
@@ -143,11 +144,11 @@ export default function PaperAttemptPage() {
   }
 
   if (loading) {
-    return <div className="mx-auto max-w-lg px-4 pb-28 pt-6 text-sm font-bold text-[var(--duo-text-muted)]">Loading paper...</div>;
+    return <div className={`${mainPageClassName} text-sm font-bold text-[var(--duo-text-muted)]`}>Loading paper...</div>;
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-6">
+    <div className={mainPageClassName}>
       <div className="mb-3 rounded-xl border-2 border-[#ff9800] bg-[#fff4e5] px-3 py-2 text-sm font-extrabold text-[#a60]">
         Each paper can only be submitted once.
       </div>
@@ -191,7 +192,7 @@ export default function PaperAttemptPage() {
                     q.answer === "BLANK"
                       ? "border-[var(--duo-border)] bg-white text-[var(--duo-text-muted)]"
                       : q.isCorrect
-                        ? "border-[#4caf50] bg-[#e9fbe9] text-[#1f7a1f]"
+                        ? "border-[#7a84ff] bg-[#ecebff] text-[#3f4fcf]"
                         : "border-[#ff4b4b] bg-[#ffe8e8] text-[#c00]"
                   }`}
                   title={
@@ -238,14 +239,14 @@ export default function PaperAttemptPage() {
         <section className="mt-6 space-y-4">
           <Link
             href="/papers/overview"
-            className="block rounded-2xl border-b-[6px] border-[var(--duo-green-shadow)] bg-gradient-to-br from-[#58cc02] to-[#43a004] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
+            className="block rounded-2xl border-b-[6px] border-[#4a56c7] bg-gradient-to-br from-[#7a84ff] via-[#8b5cf6] to-[#3ecbff] p-4 text-white shadow-[0_6px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-1 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)]"
           >
             <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">Next step</p>
             <p className="mt-1 text-lg font-black leading-snug">View stats for all published papers</p>
             <p className="mt-1 text-sm font-bold text-white/90">
               Class question rates and your theme mastery across every paper.
             </p>
-            <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#3d9400]">
+            <span className="mt-4 flex w-full items-center justify-center rounded-xl border-2 border-white/40 bg-white py-3 text-base font-black text-[#4454c8]">
               Open paper overview →
             </span>
           </Link>
@@ -288,7 +289,7 @@ export default function PaperAttemptPage() {
                 </div>
               ))}
               {result.wrongQuestions.length === 0 && (
-                <p className="text-sm font-bold text-[var(--duo-green-dark)]">Perfect score. No wrong questions.</p>
+                <p className="text-sm font-bold text-[#4454c8]">Perfect score. No wrong questions.</p>
               )}
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/auth-validation";
 import { RECOVERY_QUESTIONS } from "@/lib/recovery-questions";
@@ -64,19 +65,36 @@ export function RecoverScreen() {
       <div className="login-blob login-blob--a" aria-hidden />
       <div className="login-blob login-blob--b" aria-hidden />
       <div className="login-blob login-blob--c" aria-hidden />
+      <div className="login-stars" aria-hidden>
+        <div className="login-star login-star--a" />
+        <div className="login-star login-star--b" />
+        <div className="login-star login-star--c" />
+        <div className="login-star login-star--d" />
+        <div className="login-orbit login-orbit--a" />
+        <div className="login-orbit login-orbit--b" />
+      </div>
 
       <div className="relative z-10 mx-auto flex max-w-md flex-col items-center">
         <div className="mb-6 flex flex-col items-center">
-          <h1 className="text-center text-3xl font-black tracking-tight text-[var(--duo-text)] sm:text-4xl">
+          <Image
+            src="/branding/apple-logo-icon.png"
+            alt="Spark apple mascot"
+            width={240}
+            height={240}
+            unoptimized
+            className="mb-3 h-44 w-44 max-w-[min(100%,240px)] object-contain [filter:drop-shadow(0_12px_28px_rgba(200,80,90,0.2))_drop-shadow(0_6px_22px_rgba(255,210,120,0.45))] sm:h-52 sm:w-52"
+            priority
+          />
+          <h1 className="text-center text-[2rem] font-black leading-tight tracking-tight text-[#14224d] drop-shadow-[0_2px_0_rgba(255,255,255,0.45)] sm:text-5xl">
             Forgot password?
           </h1>
-          <p className="mt-2 max-w-sm text-center text-base font-bold text-[var(--duo-text-muted)]">
+          <p className="mt-3 max-w-sm text-center text-lg font-black leading-snug text-[#2f3f72] sm:text-xl">
             Enter your school email and the same answers you chose when you signed up. We will show you
             a password you can use to log in.
           </p>
         </div>
 
-        <div className="w-full rounded-[1.75rem] border-4 border-white bg-white/95 p-6 shadow-[0_8px_0_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-8">
+        <div className="w-full rounded-[1.75rem] border-4 border-[#edf2ff] bg-white/95 p-6 shadow-[0_8px_0_rgba(45,60,120,0.12)] backdrop-blur-sm sm:p-8">
           {!showPassword ? (
             <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
               <div>
@@ -139,11 +157,11 @@ export function RecoverScreen() {
             </form>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl border-2 border-[var(--duo-green-shadow)] bg-[#e8f7e0] p-4">
+              <div className="rounded-2xl border-2 border-[#7a84ff] bg-[#ecebff] p-4">
                 {infoMessage && (
-                  <p className="mb-3 text-sm font-bold text-[var(--duo-green-dark)]">{infoMessage}</p>
+                  <p className="mb-3 text-sm font-bold text-[#3f4fcf]">{infoMessage}</p>
                 )}
-                <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[var(--duo-green-dark)]">
+                <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[#3f4fcf]">
                   Your login password
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -181,7 +199,7 @@ export function RecoverScreen() {
           )}
         </div>
 
-        <p className="mt-8 text-center text-sm font-bold text-white/90 drop-shadow-sm">
+        <p className="mt-8 text-center text-sm font-bold text-[#f7f9ff] drop-shadow-sm">
           Physics Error Bank — learn smarter, one mistake at a time.
         </p>
       </div>
