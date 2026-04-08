@@ -5,7 +5,7 @@ import { normalizeEmail } from "@/lib/auth-validation";
 export type UserRoleName = "STUDENT" | "TEACHER";
 
 /** Built-in defaults; merged with TEACHER_EMAILS (comma-separated). Cached for process lifetime. */
-const DEFAULT_TEACHER_EMAILS = ["yutshen@uwcchina.org"] as const;
+const DEFAULT_TEACHER_EMAILS = ["yutshen@uwcchina.org", "kofosu@uwcchina.org"] as const;
 
 let cachedTeacherEmailsFromEnv: Set<string> | null = null;
 
