@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname } from "next/navigation";
 import { apiFetchJson } from "@/lib/api-client";
 import type { MistakeEntry } from "@/lib/types";
 
@@ -62,7 +61,6 @@ async function fetchMistakesList(): Promise<{ ok: true; mistakes: MistakeEntry[]
 }
 
 export function MistakesProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const hasFetchedRef = useRef(false);
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [ready, setReady] = useState(false);
@@ -92,19 +90,11 @@ export function MistakesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Do not fetch mistakes on auth screen; prevents stale 401 flashing after SPA login redirect.
-    if (pathname === "/") {
-      hasFetchedRef.current = false;
-      setMistakes([]);
-      setLoadError(null);
-      setLoading(false);
-      setReady(true);
-      return;
-    }
+    // Only mounted under `(main)` shell — no login route; fetch once per session in this subtree.
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
     void refetchMistakes();
-  }, [pathname, refetchMistakes]);
+  }, [refetchMistakes]);
 
   const addMistake = useCallback(async (input: AddMistakeInput, options?: AddMistakeOptions) => {
     setSaving(true);

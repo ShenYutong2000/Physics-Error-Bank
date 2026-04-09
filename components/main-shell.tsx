@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { DuoDesktopSidebar, DuoNav } from "@/components/duo-nav";
+import { MistakesProvider } from "@/components/mistakes-provider";
 
 type Props = {
   email: string;
@@ -118,7 +119,9 @@ export function MainShell({ email, name, role, children }: Props) {
           </div>
         </div>
         )}
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <MistakesProvider>{children}</MistakesProvider>
+        </main>
       </div>
       <DuoNav isTeacher={role === "TEACHER"} />
     </div>
