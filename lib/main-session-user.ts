@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuthSecret } from "@/lib/auth-config";
@@ -12,7 +13,7 @@ export type MainGroupUser = {
 };
 
 /** Session + DB user for `(main)` routes; redirects to `/` if unauthenticated. */
-export async function getMainGroupUserOrRedirect(): Promise<MainGroupUser> {
+export const getMainGroupUserOrRedirect = cache(async function getMainGroupUserOrRedirect(): Promise<MainGroupUser> {
   const token = (await cookies()).get(sessionCookieName())?.value;
   const secret = getAuthSecret();
   if (!token || !secret) {
@@ -31,4 +32,4 @@ export async function getMainGroupUserOrRedirect(): Promise<MainGroupUser> {
     role: (user?.role ?? "STUDENT") as "STUDENT" | "TEACHER",
     name: user?.name ?? "",
   };
-}
+});

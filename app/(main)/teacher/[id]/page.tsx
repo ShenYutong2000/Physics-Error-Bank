@@ -27,6 +27,18 @@ function compareAccuracyLowToHigh(a: number | null | undefined, b: number | null
   return a - b;
 }
 
+function masteryMap(rows: TagMasteryRow[]): Map<string, TagMasteryRow> {
+  return new Map(rows.map((r) => [r.tag, r]));
+}
+
+function deltaBadgeClass(delta: number): string {
+  if (delta >= 10) return "border-[#c92a2a] bg-[#ffe8e8] text-[#b42318]";
+  if (delta >= 3) return "border-[#e67700] bg-[#fff4e5] text-[#a65b00]";
+  if (delta <= -10) return "border-[#2b8a3e] bg-[#e6f9ec] text-[#1f6f31]";
+  if (delta <= -3) return "border-[#2f9e44] bg-[#f0fff4] text-[#2b8a3e]";
+  return "border-[#b6d4fe] bg-[#eef6ff] text-[#1c6ed6]";
+}
+
 type PaperQuestionKeyRow = {
   number: number;
   correctAnswer: string;
@@ -207,6 +219,11 @@ export default function TeacherPaperDetailPage() {
     }
     return filtered;
   }, [analytics?.students, studentSearch, studentListSort]);
+
+  const classMasteryByTag = useMemo(
+    () => masteryMap(sortMasteryRows(analytics?.overall.correctTagMastery ?? [])),
+    [analytics?.overall.correctTagMastery, sortMasteryRows],
+  );
 
   async function saveQuestions() {
     setSavingQuestions(true);
@@ -533,10 +550,9 @@ export default function TeacherPaperDetailPage() {
                 </div>
               )}
               <div className="mt-2">
-                <TagStatsChart
-                  rows={sortMasteryRows(s.correctTagMastery)}
-                  emptyMessage="No answers in this slice."
-                  ariaLabel="Bar chart of mastery rate per syllabus theme for one student"
+                <StudentVsClassMastery
+                  studentRows={sortMasteryRows(s.correctTagMastery)}
+                  classMasteryByTag={classMasteryByTag}
                 />
               </div>
             </div>
@@ -548,6 +564,57 @@ export default function TeacherPaperDetailPage() {
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+function StudentVsClassMastery({
+  studentRows,
+  classMasteryByTag,
+}: {
+  studentRows: TagMasteryRow[];
+  classMasteryByTag: Map<string, TagMasteryRow>;
+}) {
+  if (studentRows.length === 0) {
+    return (
+      <div className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+        No answers in this slice.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#faf6ff] via-white to-[#fff9ff] p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
+          Student vs class by theme
+        </h4>
+        <span className="text-[11px] font-bold text-[#6b5a95]">Delta = student - class</span>
+      </div>
+      <div className="space-y-2">
+        {studentRows.map((row) => {
+          const classRow = classMasteryByTag.get(row.tag);
+          const classPct = classRow?.masteryPercent ?? 0;
+          const delta = Number((row.masteryPercent - classPct).toFixed(1));
+          const deltaText = `${delta >= 0 ? "+" : ""}${delta}%`;
+          return (
+            <div key={row.tag} className="rounded-lg border border-[#eadfff] bg-white px-2 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-[var(--duo-text)]">{row.tag}</span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold tabular-nums ${deltaBadgeClass(delta)}`}
+                >
+                  {deltaText}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[11px] font-bold">
+                <span className="text-[#6b5a95]">Student {row.masteryPercent}%</span>
+                <span className="text-[var(--duo-text-muted)]">Class {classPct}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

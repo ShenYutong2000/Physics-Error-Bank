@@ -23,6 +23,13 @@ function displayStudentLabel(s: StudentMistakeAnalyticsRow): string {
 
 type StudentListSort = "name_az" | "mistakes_high" | "mistakes_low";
 
+function heatColor(count: number, max: number): string {
+  if (count <= 0 || max <= 0) return "#f3f7ff";
+  const ratio = Math.min(count / max, 1);
+  const alpha = 0.12 + ratio * 0.68;
+  return `rgba(28, 110, 214, ${alpha.toFixed(3)})`;
+}
+
 export default function TeacherMistakesAnalyticsPage() {
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +72,44 @@ export default function TeacherMistakesAnalyticsPage() {
     const visible = displayedStudents.some((s) => s.userId === expandedId);
     if (!visible) setExpandedId(null);
   }, [displayedStudents, expandedId]);
+
+  const topTags = useMemo(() => {
+    return (data?.overall.tagRows ?? []).slice(0, 8).map((r) => r.tag);
+  }, [data?.overall.tagRows]);
+
+  const heatmapStudents = useMemo(() => {
+    return [...displayedStudents]
+      .sort(
+        (a, b) =>
+          b.mistakeCount - a.mistakeCount ||
+          displayStudentLabel(a).localeCompare(displayStudentLabel(b), "en"),
+      )
+      .slice(0, 12);
+  }, [displayedStudents]);
+
+  const studentTagCountMap = useMemo(() => {
+    const m = new Map<string, Map<string, number>>();
+    for (const s of heatmapStudents) {
+      m.set(
+        s.userId,
+        new Map(s.tagRows.map((r) => [r.tag, r.count])),
+      );
+    }
+    return m;
+  }, [heatmapStudents]);
+
+  const heatMax = useMemo(() => {
+    let max = 0;
+    for (const s of heatmapStudents) {
+      const tags = studentTagCountMap.get(s.userId);
+      if (!tags) continue;
+      for (const tag of topTags) {
+        const v = tags.get(tag) ?? 0;
+        if (v > max) max = v;
+      }
+    }
+    return max;
+  }, [heatmapStudents, studentTagCountMap, topTags]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +171,66 @@ export default function TeacherMistakesAnalyticsPage() {
               emptyMessage="No tagged mistakes from students yet."
               ariaLabel="Bar chart of mistakes per tag across all students"
             />
+          </section>
+
+          <section className="mb-6 rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f5f9ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Class heatmap (student × tag)</h2>
+            <p className="mt-1 text-xs font-bold text-[var(--duo-text-muted)]">
+              Quick scan of concentration patterns. Columns show top 8 class tags; rows show top 12 students by
+              mistake count in the current filter.
+            </p>
+            {topTags.length > 0 && heatmapStudents.length > 0 ? (
+              <>
+                <div className="mt-3 overflow-x-auto rounded-xl border-2 border-[#dbe7ff] bg-white">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-10 border-b-2 border-[#dbe7ff] bg-[#eef4ff] px-3 py-2 text-left text-[11px] font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]">
+                          Student
+                        </th>
+                        {topTags.map((tag) => (
+                          <th
+                            key={tag}
+                            className="border-b-2 border-[#dbe7ff] bg-[#f7faff] px-3 py-2 text-center text-[11px] font-extrabold uppercase tracking-wide text-[var(--duo-text-muted)]"
+                          >
+                            {tag}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {heatmapStudents.map((s) => (
+                        <tr key={s.userId}>
+                          <th className="sticky left-0 z-10 border-b border-[#edf3ff] bg-white px-3 py-2 text-left text-xs font-bold text-[var(--duo-text)]">
+                            {displayStudentLabel(s)}
+                          </th>
+                          {topTags.map((tag) => {
+                            const count = studentTagCountMap.get(s.userId)?.get(tag) ?? 0;
+                            return (
+                              <td
+                                key={`${s.userId}-${tag}`}
+                                className="border-b border-[#edf3ff] px-3 py-2 text-center text-xs font-extrabold tabular-nums text-[var(--duo-text)]"
+                                style={{ backgroundColor: heatColor(count, heatMax) }}
+                                title={`${displayStudentLabel(s)} · ${tag}: ${count}`}
+                              >
+                                {count}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs font-bold text-[var(--duo-text-muted)]">
+                  Color intensity scales from 0 to {heatMax} mistakes in this table.
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+                Not enough class data yet to render the heatmap.
+              </p>
+            )}
           </section>
 
           <section aria-label="Student mistake lists">
