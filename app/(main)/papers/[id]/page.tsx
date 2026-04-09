@@ -47,6 +47,7 @@ export default function PaperAttemptPage() {
   const [themeQuestionCounts, setThemeQuestionCounts] = useState<PaperThemeCountRow[]>([]);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
       setLoading(true);
       const r = await apiFetchJson<{
@@ -70,9 +71,14 @@ export default function PaperAttemptPage() {
         } | null;
       }>(
         `/api/papers/${encodeURIComponent(paperId)}`,
+        {
+          signal: controller.signal,
+          timeoutMs: 12_000,
+        },
       );
       setLoading(false);
       if (!r.ok) {
+        if (r.error === "Request cancelled.") return;
         setError(r.error);
         return;
       }
@@ -101,6 +107,7 @@ export default function PaperAttemptPage() {
         setSubmittedAnswers([]);
       }
     })();
+    return () => controller.abort();
   }, [paperId]);
 
   const answeredCount = useMemo(
@@ -133,6 +140,8 @@ export default function PaperAttemptPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      timeoutMs: 15_000,
+      timeoutMessage: "Submitting is taking too long. Please check network and try again.",
     });
     setSubmitting(false);
     if (!r.ok) {
