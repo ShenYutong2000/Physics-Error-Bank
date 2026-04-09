@@ -28,6 +28,8 @@ type TeacherPanelState = {
 };
 
 type StudentPaperSort = "risk_high" | "risk_low" | "latest";
+const INITIAL_VISIBLE_PAPERS = 8;
+const VISIBLE_PAPERS_STEP = 8;
 
 function masteryBand(percent: number): "high" | "medium" | "low" {
   if (percent >= 80) return "high";
@@ -40,8 +42,11 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   const [teacherData, setTeacherData] = useState<TeacherPanelState>({ classData: null, selectedData: null });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedLoading, setSelectedLoading] = useState(false);
   const [studentId, setStudentId] = useState<string>("");
   const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>("risk_high");
+  const [studentVisibleCount, setStudentVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
+  const [teacherVisibleCount, setTeacherVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
 
   useEffect(() => {
     if (variant !== "teacher" || typeof window === "undefined") return;
@@ -49,12 +54,6 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     const v = params.get("studentId") ?? "";
     setStudentId(v);
   }, [variant]);
-
-  const queryString = useMemo(() => {
-    if (variant !== "teacher") return "";
-    if (!studentId.trim()) return "";
-    return `?studentId=${encodeURIComponent(studentId.trim())}`;
-  }, [variant, studentId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,26 +67,17 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
         return;
       }
 
-      if (!studentId.trim()) {
-        setTeacherData({ classData: classResp.data, selectedData: null });
-        setData(null);
-        setLoading(false);
-        return;
-      }
-
-      const selectedResp = await apiFetchJson<StatsPayload>(`/api/papers/stats${queryString}`);
-      setLoading(false);
-      if (!selectedResp.ok) {
-        setError(selectedResp.error);
-        setTeacherData({ classData: classResp.data, selectedData: null });
-        return;
-      }
-      setTeacherData({ classData: classResp.data, selectedData: selectedResp.data });
+      setTeacherData((prev) => ({
+        classData: classResp.data,
+        selectedData:
+          prev.selectedData && prev.selectedData.selectedStudent?.userId === studentId.trim() ? prev.selectedData : null,
+      }));
       setData(null);
+      setLoading(false);
       return;
     }
 
-    const r = await apiFetchJson<StatsPayload>(`/api/papers/stats${queryString}`);
+    const r = await apiFetchJson<StatsPayload>("/api/papers/stats");
     setLoading(false);
     if (!r.ok) {
       setError(r.error);
@@ -96,11 +86,37 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     }
     setTeacherData({ classData: null, selectedData: null });
     setData(r.data);
-  }, [queryString, variant]);
+  }, [studentId, variant]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (variant !== "teacher" || !teacherData.classData) return;
+    if (!studentId.trim()) {
+      setTeacherData((prev) => ({ ...prev, selectedData: null }));
+      setSelectedLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSelectedLoading(true);
+    setError(null);
+    void (async () => {
+      const selectedResp = await apiFetchJson<StatsPayload>(`/api/papers/stats?studentId=${encodeURIComponent(studentId.trim())}`);
+      if (cancelled) return;
+      setSelectedLoading(false);
+      if (!selectedResp.ok) {
+        setError(selectedResp.error);
+        setTeacherData((prev) => ({ ...prev, selectedData: null }));
+        return;
+      }
+      setTeacherData((prev) => ({ ...prev, selectedData: selectedResp.data }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, teacherData.classData, variant]);
 
   const studentMasterySummary = useMemo(() => {
     const rows = data?.crossPaperThemeMastery ?? [];
@@ -138,6 +154,14 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     return papers;
   }, [data?.papers, studentPaperSort]);
 
+  useEffect(() => {
+    setStudentVisibleCount(INITIAL_VISIBLE_PAPERS);
+  }, [studentPaperSort, data?.papers?.length]);
+
+  useEffect(() => {
+    setTeacherVisibleCount(INITIAL_VISIBLE_PAPERS);
+  }, [teacherData.classData?.papers.length]);
+
   return (
     <div className="space-y-6">
       {variant === "teacher" && (
@@ -158,6 +182,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               if (path) window.history.replaceState(null, "", path);
             }}
             className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+            disabled={loading}
           >
             <option value="">Whole class (aggregate)</option>
             {(teacherData.classData?.students ?? []).map((s) => (
@@ -202,7 +227,11 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               ) : (
                 <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Choose a student above to compare against class baseline.</p>
               )}
-              {teacherData.selectedData ? (
+              {selectedLoading ? (
+                <div className="rounded-2xl border-2 border-dashed border-[#d8c9ff] bg-white px-4 py-8 text-center text-sm font-medium text-[var(--duo-text-muted)]">
+                  Loading selected student…
+                </div>
+              ) : teacherData.selectedData ? (
                 <TagStatsChart
                   rows={teacherData.selectedData.crossPaperThemeMastery}
                   emptyMessage="This student has no published-paper answers yet."
@@ -229,9 +258,27 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                 No published papers yet.
               </p>
             )}
-            {teacherData.classData.papers.map((row) => (
+            {teacherData.classData.papers.slice(0, teacherVisibleCount).map((row) => (
               <PaperQuestionBlock key={row.paper.id} row={row} showTeacherDetailLink showStudentDetailLink={false} />
             ))}
+            {teacherData.classData.papers.length > teacherVisibleCount && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setTeacherVisibleCount((n) => n + VISIBLE_PAPERS_STEP)}
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#eef6ff] py-2 text-xs font-extrabold text-[#1c6ed6]"
+                >
+                  Show more papers ({teacherVisibleCount}/{teacherData.classData.papers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeacherVisibleCount(teacherData.classData.papers.length)}
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-white py-2 text-xs font-extrabold text-[#1c6ed6]"
+                >
+                  Show all papers ({teacherData.classData.papers.length})
+                </button>
+              </div>
+            )}
           </section>
         </>
       )}
@@ -320,7 +367,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                 No published papers yet.
               </p>
             )}
-            {displayedStudentPapers.map((row) => (
+            {displayedStudentPapers.slice(0, studentVisibleCount).map((row) => (
               <PaperQuestionBlock
                 key={row.paper.id}
                 row={row}
@@ -328,6 +375,24 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                 showStudentDetailLink
               />
             ))}
+            {displayedStudentPapers.length > studentVisibleCount && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setStudentVisibleCount((n) => n + VISIBLE_PAPERS_STEP)}
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#eef6ff] py-2 text-xs font-extrabold text-[#1c6ed6]"
+                >
+                  Show more papers ({studentVisibleCount}/{displayedStudentPapers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentVisibleCount(displayedStudentPapers.length)}
+                  className="w-full rounded-xl border-2 border-[#b6d4fe] bg-white py-2 text-xs font-extrabold text-[#1c6ed6]"
+                >
+                  Show all papers ({displayedStudentPapers.length})
+                </button>
+              </div>
+            )}
           </section>
         </>
       )}

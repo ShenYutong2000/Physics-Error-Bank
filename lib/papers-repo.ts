@@ -551,24 +551,46 @@ export async function getPublishedPapersAggregateQuestionStats(): Promise<Publis
       questions: { select: { number: true }, orderBy: { number: "asc" } },
     },
   });
+  if (papers.length === 0) return [];
+
+  const paperIds = papers.map((p) => p.id);
+  const attempts = await prisma.paperAttempt.findMany({
+    where: {
+      paperId: { in: paperIds },
+      isLatest: true,
+      user: { role: "STUDENT" },
+    },
+    select: {
+      paperId: true,
+      accuracy: true,
+      answers: {
+        where: { isCorrect: true },
+        select: { questionNumber: true },
+      },
+    },
+  });
+
+  const byPaper = new Map<string, { attemptCount: number; accuracySum: number; correctByQuestion: Map<number, number> }>();
+  for (const att of attempts) {
+    let agg = byPaper.get(att.paperId);
+    if (!agg) {
+      agg = { attemptCount: 0, accuracySum: 0, correctByQuestion: new Map<number, number>() };
+      byPaper.set(att.paperId, agg);
+    }
+    agg.attemptCount += 1;
+    agg.accuracySum += Number(att.accuracy);
+    for (const ans of att.answers) {
+      agg.correctByQuestion.set(ans.questionNumber, (agg.correctByQuestion.get(ans.questionNumber) ?? 0) + 1);
+    }
+  }
+
   const out: PublishedPaperStatsRow[] = [];
   for (const paper of papers) {
-    const attempts = await prisma.paperAttempt.findMany({
-      where: {
-        paperId: paper.id,
-        isLatest: true,
-        user: { role: "STUDENT" },
-      },
-      include: { answers: true },
-    });
-    const attemptCount = attempts.length;
+    const agg = byPaper.get(paper.id);
+    const attemptCount = agg?.attemptCount ?? 0;
     const nums = paper.questions.map((q) => q.number);
     const questions: PublishedPaperQuestionStat[] = nums.map((questionNumber) => {
-      let correctCount = 0;
-      for (const att of attempts) {
-        const ans = att.answers.find((a) => a.questionNumber === questionNumber);
-        if (ans?.isCorrect) correctCount += 1;
-      }
+      const correctCount = agg?.correctByQuestion.get(questionNumber) ?? 0;
       const correctRatePercent =
         attemptCount > 0 ? Number(((correctCount / attemptCount) * 100).toFixed(1)) : 0;
       return {
@@ -580,9 +602,7 @@ export async function getPublishedPapersAggregateQuestionStats(): Promise<Publis
     });
     const averageAccuracy =
       attemptCount > 0
-        ? Number(
-            (attempts.reduce((sum, a) => sum + Number(a.accuracy), 0) / attemptCount).toFixed(2),
-          )
+        ? Number(((agg?.accuracySum ?? 0) / attemptCount).toFixed(2))
         : 0;
     out.push({
       paper: toPaperSummary(paper),
