@@ -2,6 +2,7 @@ import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import {
+  assertImageStorageModeSafeForProduction,
   assertOssEnvForUpload,
   getImageStorageMode,
   getOssPrefix,
@@ -28,6 +29,7 @@ function resolveSafeExt(file: File): string {
 }
 
 export async function saveMistakeImage(userId: string, file: File): Promise<string> {
+  assertImageStorageModeSafeForProduction();
   const buf = Buffer.from(await file.arrayBuffer());
   const safeExt = resolveSafeExt(file);
   const name = `${randomUUID()}${safeExt}`;

@@ -20,6 +20,19 @@ export function isOssConfigured(): boolean {
   );
 }
 
+/**
+ * Guard against accidental local filesystem uploads in production/serverless.
+ * On platforms like Vercel, local disk is ephemeral and not suitable for persistent user uploads.
+ */
+export function assertImageStorageModeSafeForProduction(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  if (getImageStorageMode() === "local") {
+    throw new Error(
+      "IMAGE_STORAGE=local is not supported in production. Use IMAGE_STORAGE=oss and configure OSS environment variables.",
+    );
+  }
+}
+
 /** True when DB key was stored from OSS upload (prefix/userId/file). */
 export function isOssImageKey(imageKey: string): boolean {
   const prefix = getOssPrefix();
@@ -28,6 +41,7 @@ export function isOssImageKey(imageKey: string): boolean {
 
 /** Call before saving when mode is OSS. */
 export function assertOssEnvForUpload(): void {
+  assertImageStorageModeSafeForProduction();
   if (getImageStorageMode() !== "oss") return;
   if (!isOssConfigured()) {
     throw new Error(
