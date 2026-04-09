@@ -162,6 +162,8 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     setTeacherVisibleCount(INITIAL_VISIBLE_PAPERS);
   }, [teacherData.classData?.papers.length]);
 
+  const teacherPapers = teacherData.classData?.papers ?? [];
+
   return (
     <div className="space-y-6">
       {variant === "teacher" && (
@@ -253,29 +255,29 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               Correct rate per question = students who got it right ÷ students who submitted this paper (latest
               attempt each).
             </p>
-            {teacherData.classData.papers.length === 0 && (
+            {teacherPapers.length === 0 && (
               <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
                 No published papers yet.
               </p>
             )}
-            {teacherData.classData.papers.slice(0, teacherVisibleCount).map((row) => (
+            {teacherPapers.slice(0, teacherVisibleCount).map((row) => (
               <PaperQuestionBlock key={row.paper.id} row={row} showTeacherDetailLink showStudentDetailLink={false} />
             ))}
-            {teacherData.classData.papers.length > teacherVisibleCount && (
+            {teacherPapers.length > teacherVisibleCount && (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setTeacherVisibleCount((n) => n + VISIBLE_PAPERS_STEP)}
                   className="w-full rounded-xl border-2 border-[#b6d4fe] bg-[#eef6ff] py-2 text-xs font-extrabold text-[#1c6ed6]"
                 >
-                  Show more papers ({teacherVisibleCount}/{teacherData.classData.papers.length})
+                  Show more papers ({teacherVisibleCount}/{teacherPapers.length})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTeacherVisibleCount(teacherData.classData.papers.length)}
+                  onClick={() => setTeacherVisibleCount(teacherPapers.length)}
                   className="w-full rounded-xl border-2 border-[#b6d4fe] bg-white py-2 text-xs font-extrabold text-[#1c6ed6]"
                 >
-                  Show all papers ({teacherData.classData.papers.length})
+                  Show all papers ({teacherPapers.length})
                 </button>
               </div>
             )}
