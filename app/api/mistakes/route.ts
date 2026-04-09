@@ -127,6 +127,9 @@ export async function POST(request: Request) {
     if (msg.includes("Only preset A-E tags are allowed")) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
+    if (msg.includes("IMAGE_STORAGE=local is not supported in production")) {
+      return NextResponse.json({ error: msg }, { status: 503 });
+    }
     if (msg.includes("IMAGE_STORAGE=oss") || msg.includes("OSS environment")) {
       return NextResponse.json({ error: msg }, { status: 503 });
     }

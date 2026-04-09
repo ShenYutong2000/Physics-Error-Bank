@@ -12,16 +12,22 @@ export default function PapersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
       setLoading(true);
-      const result = await apiFetchJson<{ papers: PaperSummary[] }>("/api/papers");
+      const result = await apiFetchJson<{ papers: PaperSummary[] }>("/api/papers", {
+        signal: controller.signal,
+        timeoutMs: 10_000,
+      });
       setLoading(false);
       if (!result.ok) {
+        if (result.error === "Request cancelled.") return;
         setError(result.error);
         return;
       }
       setPapers(result.data.papers ?? []);
     })();
+    return () => controller.abort();
   }, []);
 
   return (

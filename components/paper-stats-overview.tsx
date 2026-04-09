@@ -57,9 +57,10 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
       setLoading(true);
       setError(null);
       if (variant === "teacher") {
-        const classResp = await apiFetchJson<StatsPayload>("/api/papers/stats");
+        const classResp = await apiFetchJson<StatsPayload>("/api/papers/stats", { timeoutMs: 12_000 });
         if (cancelled) return;
         if (!classResp.ok) {
+          if (classResp.error === "Request cancelled.") return;
           setLoading(false);
           setError(classResp.error);
           setTeacherData({ classData: null, selectedData: null });
@@ -75,10 +76,11 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
         return;
       }
 
-      const r = await apiFetchJson<StatsPayload>("/api/papers/stats");
+      const r = await apiFetchJson<StatsPayload>("/api/papers/stats", { timeoutMs: 12_000 });
       if (cancelled) return;
       setLoading(false);
       if (!r.ok) {
+        if (r.error === "Request cancelled.") return;
         setError(r.error);
         setData(null);
         return;
@@ -97,10 +99,14 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     void (async () => {
       setSelectedLoading(true);
       setError(null);
-      const selectedResp = await apiFetchJson<StatsPayload>(`/api/papers/stats?studentId=${encodeURIComponent(studentId.trim())}`);
+      const selectedResp = await apiFetchJson<StatsPayload>(
+        `/api/papers/stats?studentId=${encodeURIComponent(studentId.trim())}`,
+        { timeoutMs: 12_000 },
+      );
       if (cancelled) return;
       setSelectedLoading(false);
       if (!selectedResp.ok) {
+        if (selectedResp.error === "Request cancelled.") return;
         setError(selectedResp.error);
         setTeacherData((prev) => ({ ...prev, selectedData: null }));
         return;
