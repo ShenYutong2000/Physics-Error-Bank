@@ -93,11 +93,6 @@ export default function TeacherPaperDetailPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [studentListSort, setStudentListSort] = useState<StudentListSort>("name_az");
 
-  useEffect(() => {
-    setStudentSearch("");
-    setStudentListSort("name_az");
-  }, [paperId]);
-
   const fetchAnalytics = useCallback(
     () => apiFetchJson<AnalyticsResponse>(`/api/teacher/papers/${encodeURIComponent(paperId)}/analytics?mode=latest`),
     [paperId],
@@ -120,10 +115,12 @@ export default function TeacherPaperDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setQuestionsText("");
-    setAnswerKeyQuestions([]);
-    setQuestionsKeyLoadState("idle");
     void (async () => {
+      setQuestionsText("");
+      setAnswerKeyQuestions([]);
+      setQuestionsKeyLoadState("idle");
+      setStudentSearch("");
+      setStudentListSort("name_az");
       const r = await fetchAnalytics();
       if (cancelled) return;
       if (!r.ok) {
