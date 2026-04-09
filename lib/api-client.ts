@@ -17,7 +17,7 @@ export async function apiFetchJson<T>(
   const retryCount = Math.max(0, init?.retryCount ?? 1);
   const retryDelayMs = Math.max(0, init?.retryDelayMs ?? 250);
   const requestInit: RequestInit = { ...(init ?? {}) };
-  const signal = requestInit.signal;
+  const signal = requestInit.signal ?? undefined;
   delete (requestInit as ApiFetchOptions).timeoutMs;
   delete (requestInit as ApiFetchOptions).timeoutMessage;
   delete (requestInit as ApiFetchOptions).retryCount;
