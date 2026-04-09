@@ -1,7 +1,7 @@
 import { mainPageClassName } from "@/components/main-page-layout";
 import { PaperStatsOverviewPanel } from "@/components/paper-stats-overview";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export default function PapersOverviewPage() {
   return (

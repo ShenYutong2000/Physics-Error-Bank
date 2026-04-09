@@ -67,10 +67,9 @@ export default function TeacherMistakesAnalyticsPage() {
     return filtered;
   }, [data?.students, studentSearch, studentListSort]);
 
-  useEffect(() => {
-    if (!expandedId) return;
-    const visible = displayedStudents.some((s) => s.userId === expandedId);
-    if (!visible) setExpandedId(null);
+  const safeExpandedId = useMemo(() => {
+    if (!expandedId) return null;
+    return displayedStudents.some((s) => s.userId === expandedId) ? expandedId : null;
   }, [displayedStudents, expandedId]);
 
   const topTags = useMemo(() => {
@@ -280,7 +279,7 @@ export default function TeacherMistakesAnalyticsPage() {
 
             <div className="space-y-3">
               {displayedStudents.map((s) => {
-                const open = expandedId === s.userId;
+                const open = safeExpandedId === s.userId;
                 return (
                   <div
                     key={s.userId}
