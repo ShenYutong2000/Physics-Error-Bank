@@ -55,7 +55,10 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not create paper.";
     if (msg.includes("Unique constraint")) {
-      return NextResponse.json({ error: "Paper for this year/session already exists." }, { status: 409 });
+      return NextResponse.json(
+        { error: "A paper with this name already exists. Use a different title." },
+        { status: 409 },
+      );
     }
     console.error(e);
     return NextResponse.json({ error: "Could not create paper." }, { status: 500 });
