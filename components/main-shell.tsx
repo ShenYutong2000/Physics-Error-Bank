@@ -20,7 +20,7 @@ export function MainShell({ email, name, role, children }: Props) {
   const [nameError, setNameError] = useState<string | null>(null);
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     window.location.href = "/";
   }
 
@@ -34,6 +34,7 @@ export function MainShell({ email, name, role, children }: Props) {
     try {
       const res = await fetch("/api/auth/profile", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: nameInput }),
       });

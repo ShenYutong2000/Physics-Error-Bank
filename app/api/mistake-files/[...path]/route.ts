@@ -1,7 +1,7 @@
 import { readFile, stat } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
-import { getSessionUserFromRequest } from "@/lib/api-auth";
+import { requireDbAndUser } from "@/lib/api-route-guards";
 import { isOssConfigured, isOssImageKey } from "@/lib/oss-config";
 import { getOssClient, ossKeyBelongsToUser } from "@/lib/oss-client";
 import { localUploadRoot } from "@/lib/mistake-files";
@@ -19,10 +19,11 @@ const MIME: Record<string, string> = {
 type Ctx = { params: Promise<{ path: string[] }> };
 
 export async function GET(request: Request, context: Ctx) {
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const guard = await requireDbAndUser(request);
+  if (!guard.ok) {
+    return guard.response;
   }
+  const user = guard.user;
 
   const { path: segments } = await context.params;
   if (!segments?.length) {
