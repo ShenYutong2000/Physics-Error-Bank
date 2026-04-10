@@ -111,7 +111,8 @@ model Paper {
   questions     PaperQuestion[]
   attempts      PaperAttempt[]
 
-  @@unique([year, session])
+  @@unique([title])
+  @@index([year, session])
   @@index([publishedAt])
   @@index([createdAt(sort: Desc)])
   @@map("papers")
