@@ -71,6 +71,7 @@ export function LoginScreen({ showDevHint }: Props) {
       const url = mode === "login" ? "/api/auth/login" : "/api/auth/register";
       const res = await fetch(url, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           mode === "register"

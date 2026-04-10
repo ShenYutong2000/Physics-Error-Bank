@@ -14,14 +14,25 @@ export async function requireDbAndUser(
       ),
     };
   }
-  const user = await getSessionUserFromRequest(request);
-  if (!user) {
+  try {
+    const user = await getSessionUserFromRequest(request);
+    if (!user) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
+      };
+    }
+    return { ok: true, user };
+  } catch (e) {
+    console.error("requireDbAndUser: session lookup failed", e);
     return {
       ok: false,
-      response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again." },
+        { status: 503 },
+      ),
     };
   }
-  return { ok: true, user };
 }
 
 export async function requireTeacher(

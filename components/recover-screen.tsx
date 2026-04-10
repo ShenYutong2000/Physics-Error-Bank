@@ -27,6 +27,7 @@ export function RecoverScreen() {
     try {
       const res = await fetch("/api/auth/recover", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,

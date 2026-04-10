@@ -49,8 +49,27 @@ export async function apiFetchJson<T>(
 
     try {
       const res = await fetch(input, { credentials: "include", ...requestInit, signal: controller.signal });
-      const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
+      let body = (await res.json().catch(() => ({}))) as { error?: string } & T;
       if (!res.ok) {
+        const mayRetry503 =
+          res.status === 503 && ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+        if (mayRetry503) {
+          await waitBeforeRetry(300, 0, signal);
+          const res2 = await fetch(input, {
+            credentials: "include",
+            ...requestInit,
+            signal: controller.signal,
+          });
+          body = (await res2.json().catch(() => ({}))) as { error?: string } & T;
+          if (!res2.ok) {
+            return {
+              ok: false,
+              status: res2.status,
+              error: body.error ?? "Request failed.",
+            };
+          }
+          return { ok: true, data: body };
+        }
         return {
           ok: false,
           status: res.status,

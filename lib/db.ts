@@ -8,6 +8,4 @@ export function isDatabaseConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL?.trim());
 }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
