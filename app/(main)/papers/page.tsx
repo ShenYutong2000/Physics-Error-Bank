@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { mainPageClassName } from "@/components/main-page-layout";
 import type { PaperSummary } from "@/lib/paper-types";
 
 export default function PapersPage() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
+  const [yearFilter, setYearFilter] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const availableYears = useMemo(
+    () => Array.from(new Set(papers.map((p) => p.year))).sort((a, b) => b - a),
+    [papers],
+  );
+  const filteredPapers = useMemo(
+    () => (yearFilter === "all" ? papers : papers.filter((p) => String(p.year) === yearFilter)),
+    [papers, yearFilter],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,6 +71,24 @@ export default function PapersPage() {
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
           Enter A/B/C/D answers for each question, submit, and review your wrong-tag distribution.
         </p>
+        <div className="mt-3 max-w-xs">
+          <label htmlFor="student-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
+            Filter by year
+          </label>
+          <select
+            id="student-paper-year-filter"
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
+          >
+            <option value="all">All years</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
       {loading && <p className="text-sm font-bold text-[var(--duo-text-muted)]">Loading papers...</p>}
       {error && (
@@ -70,7 +97,7 @@ export default function PapersPage() {
         </p>
       )}
       <div className="space-y-3">
-        {papers.map((paper) => (
+        {filteredPapers.map((paper) => (
           <Link
             key={paper.id}
             href={`/papers/${paper.id}`}
@@ -84,9 +111,9 @@ export default function PapersPage() {
           </Link>
         ))}
       </div>
-      {!loading && papers.length === 0 && (
+      {!loading && filteredPapers.length === 0 && (
         <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-          No papers published yet.
+          {papers.length === 0 ? "No papers published yet." : "No papers for the selected year."}
         </p>
       )}
     </div>

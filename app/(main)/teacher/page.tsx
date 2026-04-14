@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { mainPageClassName } from "@/components/main-page-layout";
 import { DEFAULT_PAPER_QUESTION_COUNT, type ExamSession, type PaperSummary } from "@/lib/paper-types";
@@ -10,10 +10,19 @@ export default function TeacherHomePage() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
+  const [yearFilter, setYearFilter] = useState<string>("all");
   const [session, setSession] = useState<ExamSession>("MAY");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [clearAllSubmissionsBusy, setClearAllSubmissionsBusy] = useState(false);
+  const availableYears = useMemo(
+    () => Array.from(new Set(papers.map((p) => p.year))).sort((a, b) => b - a),
+    [papers],
+  );
+  const filteredPapers = useMemo(
+    () => (yearFilter === "all" ? papers : papers.filter((p) => String(p.year) === yearFilter)),
+    [papers, yearFilter],
+  );
 
   async function loadPapers() {
     const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
@@ -147,7 +156,25 @@ export default function TeacherHomePage() {
       </section>
 
       <section className="space-y-3">
-        {papers.map((paper) => (
+        <div className="max-w-xs">
+          <label htmlFor="teacher-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
+            Filter by year
+          </label>
+          <select
+            id="teacher-paper-year-filter"
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
+          >
+            <option value="all">All years</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+        {filteredPapers.map((paper) => (
           <Link
             key={paper.id}
             href={`/teacher/${paper.id}`}
@@ -162,6 +189,11 @@ export default function TeacherHomePage() {
             </p>
           </Link>
         ))}
+        {filteredPapers.length === 0 && (
+          <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+            {papers.length === 0 ? "No papers yet." : "No papers for the selected year."}
+          </p>
+        )}
       </section>
 
       <section className="mt-8 rounded-2xl border-2 border-[#ff9800] bg-[#fffaf2] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
