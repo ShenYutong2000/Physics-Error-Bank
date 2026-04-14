@@ -46,15 +46,18 @@ export async function GET(request: Request) {
       const cached = getCached<{
         papers: Awaited<ReturnType<typeof getPublishedPapersAggregateQuestionStats>>;
         crossPaperThemeMastery: Awaited<ReturnType<typeof getCrossPaperThemeMasteryForUser>>;
+        classCrossPaperThemeMastery: Awaited<ReturnType<typeof getCrossPaperThemeMasteryClassWide>>;
         masteryScope: "self";
       }>(cacheKey);
       if (cached) return NextResponse.json(cached, { headers: { "x-stats-cache": "hit" } });
 
       const papers = await getPublishedPapersAggregateQuestionStats();
       const crossPaperThemeMastery = await getCrossPaperThemeMasteryForUser(guard.user.id);
+      const classCrossPaperThemeMastery = await getCrossPaperThemeMasteryClassWide();
       const payload = {
         papers,
         crossPaperThemeMastery,
+        classCrossPaperThemeMastery,
         masteryScope: "self" as const,
       };
       setCached(cacheKey, payload);

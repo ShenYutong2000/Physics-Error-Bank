@@ -11,6 +11,7 @@ type MasteryScope = "self" | "class" | "student";
 type StatsPayload = {
   papers: PublishedPaperStatsRow[];
   crossPaperThemeMastery: TagMasteryRow[];
+  classCrossPaperThemeMastery?: TagMasteryRow[];
   masteryScope: MasteryScope;
   selectedStudent?: { userId: string; name: string; email: string };
   students?: Array<{ id: string; name: string; email: string }>;
@@ -47,7 +48,20 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("studentId") ?? "";
   });
-  const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>("risk_high");
+  const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>(() => {
+    if (typeof window === "undefined") return "risk_high";
+    const raw = new URLSearchParams(window.location.search).get("sort");
+    if (raw === "risk_low" || raw === "latest" || raw === "risk_high") return raw;
+    return "risk_high";
+  });
+  const [studentYearFilter, setStudentYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
+  const [teacherYearFilter, setTeacherYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
   const [studentVisibleCount, setStudentVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
   const [teacherVisibleCount, setTeacherVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
 
@@ -118,6 +132,44 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     };
   }, [studentId, teacherData.classData, variant]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (variant !== "student") return;
+    const params = new URLSearchParams(window.location.search);
+    if (studentYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", studentYearFilter);
+    }
+    if (studentPaperSort === "risk_high") {
+      params.delete("sort");
+    } else {
+      params.set("sort", studentPaperSort);
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [studentPaperSort, studentYearFilter, variant]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (variant !== "teacher") return;
+    const params = new URLSearchParams(window.location.search);
+    if (teacherYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", teacherYearFilter);
+    }
+    if (!studentId.trim()) {
+      params.delete("studentId");
+    } else {
+      params.set("studentId", studentId.trim());
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [studentId, teacherYearFilter, variant]);
+
   const studentMasterySummary = useMemo(() => {
     const rows = data?.crossPaperThemeMastery ?? [];
     const high = rows.filter((r) => masteryBand(r.masteryPercent) === "high").length;
@@ -128,8 +180,32 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     return { high, medium, low, weakest, strongest };
   }, [data?.crossPaperThemeMastery]);
 
+  const studentAvailableYears = useMemo(
+    () => Array.from(new Set((data?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
+    [data?.papers],
+  );
+  const teacherAvailableYears = useMemo(
+    () => Array.from(new Set((teacherData.classData?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
+    [teacherData.classData?.papers],
+  );
+  const effectiveStudentYearFilter = useMemo(
+    () =>
+      studentYearFilter === "all" || studentAvailableYears.includes(Number(studentYearFilter))
+        ? studentYearFilter
+        : "all",
+    [studentAvailableYears, studentYearFilter],
+  );
+  const effectiveTeacherYearFilter = useMemo(
+    () =>
+      teacherYearFilter === "all" || teacherAvailableYears.includes(Number(teacherYearFilter))
+        ? teacherYearFilter
+        : "all",
+    [teacherAvailableYears, teacherYearFilter],
+  );
   const displayedStudentPapers = useMemo(() => {
-    const papers = [...(data?.papers ?? [])];
+    const papers = [...(data?.papers ?? [])].filter((p) =>
+      effectiveStudentYearFilter === "all" ? true : String(p.paper.year) === effectiveStudentYearFilter,
+    );
     const riskCount = (row: PublishedPaperStatsRow) => row.questions.filter((q) => q.correctRatePercent < 50).length;
     if (studentPaperSort === "risk_high") {
       papers.sort(
@@ -152,9 +228,10 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
       );
     }
     return papers;
-  }, [data?.papers, studentPaperSort]);
-
-  const teacherPapers = teacherData.classData?.papers ?? [];
+  }, [data?.papers, effectiveStudentYearFilter, studentPaperSort]);
+  const teacherPapers = (teacherData.classData?.papers ?? []).filter((p) =>
+    effectiveTeacherYearFilter === "all" ? true : String(p.paper.year) === effectiveTeacherYearFilter,
+  );
   const effectiveStudentVisibleCount = Math.min(studentVisibleCount, displayedStudentPapers.length);
   const effectiveTeacherVisibleCount = Math.min(teacherVisibleCount, teacherPapers.length);
 
@@ -173,11 +250,6 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               setStudentId(v);
               setTeacherData((prev) => ({ ...prev, selectedData: null }));
               setSelectedLoading(Boolean(v));
-              const path =
-                typeof window !== "undefined"
-                  ? `${window.location.pathname}${v ? `?studentId=${encodeURIComponent(v)}` : ""}`
-                  : "";
-              if (path) window.history.replaceState(null, "", path);
             }}
             className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
             disabled={loading}
@@ -244,16 +316,31 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-sm font-extrabold text-[var(--duo-text)]">
-              All published papers — question results (class)
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-extrabold text-[var(--duo-text)]">
+                All published papers — question results (class)
+              </h2>
+              <select
+                value={effectiveTeacherYearFilter}
+                onChange={(e) => setTeacherYearFilter(e.target.value)}
+                className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
+                aria-label="Filter teacher papers by year"
+              >
+                <option value="all">All years</option>
+                {teacherAvailableYears.map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="text-xs font-bold text-[var(--duo-text-muted)]">
               Correct rate per question = students who got it right ÷ students who submitted this paper (latest
               attempt each).
             </p>
             {teacherPapers.length === 0 && (
               <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-                No published papers yet.
+                {(teacherData.classData?.papers?.length ?? 0) === 0 ? "No published papers yet." : "No papers for the selected year."}
               </p>
             )}
             {teacherPapers.slice(0, effectiveTeacherVisibleCount).map((row) => (
@@ -322,22 +409,30 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
             )}
           </section>
 
-          <section className="rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
-            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">
-              {masteryHeading(
-                data.masteryScope,
-                data.selectedStudent?.name?.trim() || data.selectedStudent?.email,
-              )}
-            </h2>
-            <TagStatsChart
-              rows={data.crossPaperThemeMastery}
-              emptyMessage={
-                data.masteryScope === "self"
-                  ? "Complete at least one published paper to see theme mastery."
-                  : "No student answers on published papers yet."
-              }
-              ariaLabel="Theme mastery across published papers"
-            />
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (baseline)</h2>
+              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Class aggregate across all published papers.</p>
+              <TagStatsChart
+                rows={data.classCrossPaperThemeMastery ?? []}
+                emptyMessage="Class baseline will appear after students submit published papers."
+                ariaLabel="Class theme mastery across published papers"
+              />
+            </div>
+            <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">
+                {masteryHeading(
+                  data.masteryScope,
+                  data.selectedStudent?.name?.trim() || data.selectedStudent?.email,
+                )}
+              </h2>
+              <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Your results, aligned with the same theme order as class.</p>
+              <TagStatsChart
+                rows={data.crossPaperThemeMastery}
+                emptyMessage="Complete at least one published paper to see your theme mastery."
+                ariaLabel="Your theme mastery across published papers"
+              />
+            </div>
           </section>
 
           <section className="space-y-4">
@@ -345,24 +440,39 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               <h2 className="text-sm font-extrabold text-[var(--duo-text)]">
                 All published papers — question results (class)
               </h2>
-              <select
-                value={studentPaperSort}
-                onChange={(e) => setStudentPaperSort(e.target.value as StudentPaperSort)}
-                className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
-                aria-label="Sort papers by risk level or recency"
-              >
-                <option value="risk_high">Prioritize weak papers</option>
-                <option value="risk_low">Best-performing papers first</option>
-                <option value="latest">Newest papers first</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={effectiveStudentYearFilter}
+                  onChange={(e) => setStudentYearFilter(e.target.value)}
+                  className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
+                  aria-label="Filter student papers by year"
+                >
+                  <option value="all">All years</option>
+                  {studentAvailableYears.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={studentPaperSort}
+                  onChange={(e) => setStudentPaperSort(e.target.value as StudentPaperSort)}
+                  className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
+                  aria-label="Sort papers by risk level or recency"
+                >
+                  <option value="risk_high">Prioritize weak papers</option>
+                  <option value="risk_low">Best-performing papers first</option>
+                  <option value="latest">Newest papers first</option>
+                </select>
+              </div>
             </div>
             <p className="text-xs font-bold text-[var(--duo-text-muted)]">
               Correct rate per question = students who got it right ÷ students who submitted this paper (latest
               attempt each).
             </p>
-            {data.papers.length === 0 && (
+            {displayedStudentPapers.length === 0 && (
               <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-                No published papers yet.
+                {data.papers.length === 0 ? "No published papers yet." : "No papers for the selected year."}
               </p>
             )}
             {displayedStudentPapers.slice(0, effectiveStudentVisibleCount).map((row) => (

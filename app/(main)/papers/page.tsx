@@ -1,15 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { mainPageClassName } from "@/components/main-page-layout";
 import type { PaperSummary } from "@/lib/paper-types";
 
 export default function PapersPage() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
+  const [yearFilter, setYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const availableYears = useMemo(
+    () => Array.from(new Set(papers.map((p) => p.year))).sort((a, b) => b - a),
+    [papers],
+  );
+  const effectiveYearFilter = useMemo(
+    () => (yearFilter === "all" || availableYears.includes(Number(yearFilter)) ? yearFilter : "all"),
+    [availableYears, yearFilter],
+  );
+  const filteredPapers = useMemo(
+    () => (effectiveYearFilter === "all" ? papers : papers.filter((p) => String(p.year) === effectiveYearFilter)),
+    [effectiveYearFilter, papers],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,6 +45,19 @@ export default function PapersPage() {
     })();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (effectiveYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", effectiveYearFilter);
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [effectiveYearFilter]);
 
   return (
     <div className={mainPageClassName}>
@@ -62,6 +91,24 @@ export default function PapersPage() {
         <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
           Enter A/B/C/D answers for each question, submit, and review your wrong-tag distribution.
         </p>
+        <div className="mt-3 max-w-xs">
+          <label htmlFor="student-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
+            Filter by year
+          </label>
+          <select
+            id="student-paper-year-filter"
+            value={effectiveYearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
+          >
+            <option value="all">All years</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
       {loading && <p className="text-sm font-bold text-[var(--duo-text-muted)]">Loading papers...</p>}
       {error && (
@@ -70,7 +117,7 @@ export default function PapersPage() {
         </p>
       )}
       <div className="space-y-3">
-        {papers.map((paper) => (
+        {filteredPapers.map((paper) => (
           <Link
             key={paper.id}
             href={`/papers/${paper.id}`}
@@ -84,9 +131,9 @@ export default function PapersPage() {
           </Link>
         ))}
       </div>
-      {!loading && papers.length === 0 && (
+      {!loading && filteredPapers.length === 0 && (
         <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-          No papers published yet.
+          {papers.length === 0 ? "No papers published yet." : "No papers for the selected year."}
         </p>
       )}
     </div>

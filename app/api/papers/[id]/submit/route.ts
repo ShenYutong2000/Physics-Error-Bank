@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStudent } from "@/lib/api-route-guards";
-import { submitPaperAttempt } from "@/lib/papers-repo";
+import { getPaperClassComparisonStats, submitPaperAttempt } from "@/lib/papers-repo";
 import { normalizePaperChoice } from "@/lib/paper-types";
 
 export const runtime = "nodejs";
@@ -36,7 +36,8 @@ export async function POST(
       userId: guard.user.id,
       answers,
     });
-    return NextResponse.json({ paperId: id, ...result });
+    const classComparison = await getPaperClassComparisonStats(id);
+    return NextResponse.json({ paperId: id, ...result, classComparison });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not submit paper.";
     if (msg.includes("not found")) {

@@ -542,6 +542,42 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
   };
 }
 
+/** Student-safe class aggregate for one paper (no per-student detail). */
+export async function getPaperClassComparisonStats(paperId: string): Promise<{
+  studentCount: number;
+  attemptCount: number;
+  averageAccuracy: number;
+  classTagMastery: TagMasteryRow[];
+}> {
+  const attempts = await prisma.paperAttempt.findMany({
+    where: {
+      paperId,
+      isLatest: true,
+      user: { role: "STUDENT" },
+    },
+    select: {
+      userId: true,
+      accuracy: true,
+      answers: { select: { themeSnapshot: true, isCorrect: true } },
+    },
+  });
+  const studentIds = new Set(attempts.map((a) => a.userId));
+  const attemptCount = attempts.length;
+  const averageAccuracy =
+    attemptCount > 0
+      ? Number((attempts.reduce((sum, a) => sum + Number(a.accuracy), 0) / attemptCount).toFixed(2))
+      : 0;
+  const classTagMastery = toThemeMasteryRows(
+    attempts.flatMap((a) => a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect }))),
+  );
+  return {
+    studentCount: studentIds.size,
+    attemptCount,
+    averageAccuracy,
+    classTagMastery,
+  };
+}
+
 /** All published papers: per-question correct rate across students (latest attempt per student per paper). */
 export async function getPublishedPapersAggregateQuestionStats(): Promise<PublishedPaperStatsRow[]> {
   const papers = await prisma.paper.findMany({

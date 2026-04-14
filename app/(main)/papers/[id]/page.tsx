@@ -34,6 +34,12 @@ export default function PaperAttemptPage() {
     accuracy: number;
     wrongQuestions: WrongQuestion[];
     correctTagMastery: TagMasteryRow[];
+    classComparison?: {
+      studentCount: number;
+      attemptCount: number;
+      averageAccuracy: number;
+      classTagMastery: TagMasteryRow[];
+    };
   } | null>(null);
   const [submittedAnswers, setSubmittedAnswers] = useState<
     Array<{
@@ -61,6 +67,12 @@ export default function PaperAttemptPage() {
           accuracy: number;
           wrongQuestions: WrongQuestion[];
           correctTagMastery: TagMasteryRow[];
+          classComparison?: {
+            studentCount: number;
+            attemptCount: number;
+            averageAccuracy: number;
+            classTagMastery: TagMasteryRow[];
+          };
           themeQuestionCounts: PaperThemeCountRow[];
           submittedAnswers: Array<{
             questionNumber: number;
@@ -69,6 +81,12 @@ export default function PaperAttemptPage() {
             isCorrect: boolean;
           }>;
         } | null;
+        classComparison?: {
+          studentCount: number;
+          attemptCount: number;
+          averageAccuracy: number;
+          classTagMastery: TagMasteryRow[];
+        };
       }>(
         `/api/papers/${encodeURIComponent(paperId)}`,
         {
@@ -99,6 +117,7 @@ export default function PaperAttemptPage() {
           accuracy: r.data.existingAttempt.accuracy,
           wrongQuestions: r.data.existingAttempt.wrongQuestions,
           correctTagMastery: r.data.existingAttempt.correctTagMastery,
+          classComparison: r.data.classComparison,
         });
         setSubmittedAnswers(r.data.existingAttempt.submittedAnswers);
       } else {
@@ -136,6 +155,12 @@ export default function PaperAttemptPage() {
       wrongQuestions: WrongQuestion[];
       correctTagMastery: TagMasteryRow[];
       themeQuestionCounts: PaperThemeCountRow[];
+      classComparison?: {
+        studentCount: number;
+        attemptCount: number;
+        averageAccuracy: number;
+        classTagMastery: TagMasteryRow[];
+      };
     }>(`/api/papers/${encodeURIComponent(paperId)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -267,6 +292,11 @@ export default function PaperAttemptPage() {
             <p className="text-sm font-bold text-[var(--duo-text-muted)]">
               Wrong: {result.wrongCount}
             </p>
+            {result.classComparison && (
+              <p className="mt-1 text-sm font-bold text-[var(--duo-text-muted)]">
+                Class avg: {result.classComparison.averageAccuracy}% ({result.classComparison.studentCount} students)
+              </p>
+            )}
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <PaperThemeBreakdownTable
@@ -286,6 +316,26 @@ export default function PaperAttemptPage() {
               ariaLabel="Bar chart of mastery rate per syllabus theme"
             />
           </div>
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (this paper)</h2>
+              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Class aggregate for latest submissions on this paper.</p>
+              <TagStatsChart
+                rows={result.classComparison?.classTagMastery ?? []}
+                emptyMessage="Class comparison will appear when submissions are available."
+                ariaLabel="Class theme mastery on this paper"
+              />
+            </div>
+            <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Your mastery (this paper)</h2>
+              <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Your correct-rate profile by theme on this paper.</p>
+              <TagStatsChart
+                rows={result.correctTagMastery}
+                emptyMessage="No answers yet."
+                ariaLabel="Your theme mastery on this paper"
+              />
+            </div>
+          </section>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Wrong questions</h2>
             <div className="space-y-2">
