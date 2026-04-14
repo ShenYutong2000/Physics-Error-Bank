@@ -38,14 +38,6 @@ function masteryBand(percent: number): "high" | "medium" | "low" {
   return "low";
 }
 
-function deltaBadgeClass(delta: number): string {
-  if (delta >= 10) return "border-[#c92a2a] bg-[#ffe8e8] text-[#b42318]";
-  if (delta >= 3) return "border-[#e67700] bg-[#fff4e5] text-[#a65b00]";
-  if (delta <= -10) return "border-[#2b8a3e] bg-[#e6f9ec] text-[#1f6f31]";
-  if (delta <= -3) return "border-[#2f9e44] bg-[#f0fff4] text-[#2b8a3e]";
-  return "border-[#b6d4fe] bg-[#eef6ff] text-[#1c6ed6]";
-}
-
 export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "teacher" }) {
   const [data, setData] = useState<StatsPayload | null>(null);
   const [teacherData, setTeacherData] = useState<TeacherPanelState>({ classData: null, selectedData: null });
@@ -59,7 +51,6 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>("risk_high");
   const [studentVisibleCount, setStudentVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
   const [teacherVisibleCount, setTeacherVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
-  const [studentShowOnlyWeakThemes, setStudentShowOnlyWeakThemes] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,19 +154,6 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     }
     return papers;
   }, [data?.papers, studentPaperSort]);
-  const classMasteryByTag = useMemo(
-    () => new Map((data?.classCrossPaperThemeMastery ?? []).map((r) => [r.tag, r])),
-    [data?.classCrossPaperThemeMastery],
-  );
-  const displayedStudentThemeComparisonRows = useMemo(() => {
-    const rows = data?.crossPaperThemeMastery ?? [];
-    if (!studentShowOnlyWeakThemes) return rows;
-    return rows.filter((row) => {
-      const classPct = classMasteryByTag.get(row.tag)?.masteryPercent ?? 0;
-      return row.masteryPercent < classPct;
-    });
-  }, [classMasteryByTag, data?.crossPaperThemeMastery, studentShowOnlyWeakThemes]);
-
   const teacherPapers = teacherData.classData?.papers ?? [];
   const effectiveStudentVisibleCount = Math.min(studentVisibleCount, displayedStudentPapers.length);
   const effectiveTeacherVisibleCount = Math.min(teacherVisibleCount, teacherPapers.length);
@@ -344,72 +322,30 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
             )}
           </section>
 
-          <section className="rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
-            <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">
-              {masteryHeading(
-                data.masteryScope,
-                data.selectedStudent?.name?.trim() || data.selectedStudent?.email,
-              )}
-            </h2>
-            <TagStatsChart
-              rows={data.crossPaperThemeMastery}
-              emptyMessage={
-                data.masteryScope === "self"
-                  ? "Complete at least one published paper to see theme mastery."
-                  : "No student answers on published papers yet."
-              }
-              ariaLabel="Theme mastery across published papers"
-            />
-          </section>
-          <section className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#faf6ff] via-white to-[#fff9ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Your mastery vs class baseline</h2>
-              <span className="text-[11px] font-bold text-[#6b5a95]">Delta = you - class</span>
-            </div>
-            <label className="mb-3 flex items-center gap-2 text-xs font-bold text-[var(--duo-text-muted)]">
-              <input
-                type="checkbox"
-                checked={studentShowOnlyWeakThemes}
-                onChange={(e) => setStudentShowOnlyWeakThemes(e.target.checked)}
-                className="h-4 w-4 accent-[#7a84ff]"
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (baseline)</h2>
+              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Class aggregate across all published papers.</p>
+              <TagStatsChart
+                rows={data.classCrossPaperThemeMastery ?? []}
+                emptyMessage="Class baseline will appear after students submit published papers."
+                ariaLabel="Class theme mastery across published papers"
               />
-              Only show weak themes (below class baseline)
-            </label>
-            {(data.classCrossPaperThemeMastery ?? []).length === 0 ? (
-              <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-white px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-                Class baseline will appear after students submit published papers.
-              </p>
-            ) : displayedStudentThemeComparisonRows.length === 0 ? (
-              <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-white px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
-                {studentShowOnlyWeakThemes
-                  ? "Great work. No weak themes below class baseline right now."
-                  : "No theme comparison data yet."}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {displayedStudentThemeComparisonRows.map((row) => {
-                  const classPct = classMasteryByTag.get(row.tag)?.masteryPercent ?? 0;
-                  const delta = Number((row.masteryPercent - classPct).toFixed(1));
-                  return (
-                    <div key={row.tag} className="rounded-lg border border-[#eadfff] bg-white px-2 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-extrabold text-[var(--duo-text)]">{row.tag}</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold tabular-nums ${deltaBadgeClass(delta)}`}
-                        >
-                          {delta >= 0 ? "+" : ""}
-                          {delta}%
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] font-bold">
-                        <span className="text-[#6b5a95]">You {row.masteryPercent}%</span>
-                        <span className="text-[var(--duo-text-muted)]">Class {classPct}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            </div>
+            <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+              <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">
+                {masteryHeading(
+                  data.masteryScope,
+                  data.selectedStudent?.name?.trim() || data.selectedStudent?.email,
+                )}
+              </h2>
+              <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Your results, aligned with the same theme order as class.</p>
+              <TagStatsChart
+                rows={data.crossPaperThemeMastery}
+                emptyMessage="Complete at least one published paper to see your theme mastery."
+                ariaLabel="Your theme mastery across published papers"
+              />
+            </div>
           </section>
 
           <section className="space-y-4">
