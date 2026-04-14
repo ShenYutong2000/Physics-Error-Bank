@@ -48,9 +48,20 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("studentId") ?? "";
   });
-  const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>("risk_high");
-  const [studentYearFilter, setStudentYearFilter] = useState<string>("all");
-  const [teacherYearFilter, setTeacherYearFilter] = useState<string>("all");
+  const [studentPaperSort, setStudentPaperSort] = useState<StudentPaperSort>(() => {
+    if (typeof window === "undefined") return "risk_high";
+    const raw = new URLSearchParams(window.location.search).get("sort");
+    if (raw === "risk_low" || raw === "latest" || raw === "risk_high") return raw;
+    return "risk_high";
+  });
+  const [studentYearFilter, setStudentYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
+  const [teacherYearFilter, setTeacherYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
   const [studentVisibleCount, setStudentVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
   const [teacherVisibleCount, setTeacherVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
 
@@ -121,6 +132,44 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     };
   }, [studentId, teacherData.classData, variant]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (variant !== "student") return;
+    const params = new URLSearchParams(window.location.search);
+    if (studentYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", studentYearFilter);
+    }
+    if (studentPaperSort === "risk_high") {
+      params.delete("sort");
+    } else {
+      params.set("sort", studentPaperSort);
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [studentPaperSort, studentYearFilter, variant]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (variant !== "teacher") return;
+    const params = new URLSearchParams(window.location.search);
+    if (teacherYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", teacherYearFilter);
+    }
+    if (!studentId.trim()) {
+      params.delete("studentId");
+    } else {
+      params.set("studentId", studentId.trim());
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [studentId, teacherYearFilter, variant]);
+
   const studentMasterySummary = useMemo(() => {
     const rows = data?.crossPaperThemeMastery ?? [];
     const high = rows.filter((r) => masteryBand(r.masteryPercent) === "high").length;
@@ -131,9 +180,31 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     return { high, medium, low, weakest, strongest };
   }, [data?.crossPaperThemeMastery]);
 
+  const studentAvailableYears = useMemo(
+    () => Array.from(new Set((data?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
+    [data?.papers],
+  );
+  const teacherAvailableYears = useMemo(
+    () => Array.from(new Set((teacherData.classData?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
+    [teacherData.classData?.papers],
+  );
+  const effectiveStudentYearFilter = useMemo(
+    () =>
+      studentYearFilter === "all" || studentAvailableYears.includes(Number(studentYearFilter))
+        ? studentYearFilter
+        : "all",
+    [studentAvailableYears, studentYearFilter],
+  );
+  const effectiveTeacherYearFilter = useMemo(
+    () =>
+      teacherYearFilter === "all" || teacherAvailableYears.includes(Number(teacherYearFilter))
+        ? teacherYearFilter
+        : "all",
+    [teacherAvailableYears, teacherYearFilter],
+  );
   const displayedStudentPapers = useMemo(() => {
     const papers = [...(data?.papers ?? [])].filter((p) =>
-      studentYearFilter === "all" ? true : String(p.paper.year) === studentYearFilter,
+      effectiveStudentYearFilter === "all" ? true : String(p.paper.year) === effectiveStudentYearFilter,
     );
     const riskCount = (row: PublishedPaperStatsRow) => row.questions.filter((q) => q.correctRatePercent < 50).length;
     if (studentPaperSort === "risk_high") {
@@ -157,17 +228,9 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
       );
     }
     return papers;
-  }, [data?.papers, studentPaperSort, studentYearFilter]);
+  }, [data?.papers, effectiveStudentYearFilter, studentPaperSort]);
   const teacherPapers = (teacherData.classData?.papers ?? []).filter((p) =>
-    teacherYearFilter === "all" ? true : String(p.paper.year) === teacherYearFilter,
-  );
-  const studentAvailableYears = useMemo(
-    () => Array.from(new Set((data?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
-    [data?.papers],
-  );
-  const teacherAvailableYears = useMemo(
-    () => Array.from(new Set((teacherData.classData?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
-    [teacherData.classData?.papers],
+    effectiveTeacherYearFilter === "all" ? true : String(p.paper.year) === effectiveTeacherYearFilter,
   );
   const effectiveStudentVisibleCount = Math.min(studentVisibleCount, displayedStudentPapers.length);
   const effectiveTeacherVisibleCount = Math.min(teacherVisibleCount, teacherPapers.length);
@@ -187,11 +250,6 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               setStudentId(v);
               setTeacherData((prev) => ({ ...prev, selectedData: null }));
               setSelectedLoading(Boolean(v));
-              const path =
-                typeof window !== "undefined"
-                  ? `${window.location.pathname}${v ? `?studentId=${encodeURIComponent(v)}` : ""}`
-                  : "";
-              if (path) window.history.replaceState(null, "", path);
             }}
             className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
             disabled={loading}
@@ -263,7 +321,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                 All published papers — question results (class)
               </h2>
               <select
-                value={teacherYearFilter}
+                value={effectiveTeacherYearFilter}
                 onChange={(e) => setTeacherYearFilter(e.target.value)}
                 className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
                 aria-label="Filter teacher papers by year"
@@ -384,7 +442,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               </h2>
               <div className="flex items-center gap-2">
                 <select
-                  value={studentYearFilter}
+                  value={effectiveStudentYearFilter}
                   onChange={(e) => setStudentYearFilter(e.target.value)}
                   className="rounded-lg border-2 border-[#b6d4fe] bg-[#f4f9ff] px-2 py-1 text-xs font-bold"
                   aria-label="Filter student papers by year"
@@ -412,7 +470,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
               Correct rate per question = students who got it right ÷ students who submitted this paper (latest
               attempt each).
             </p>
-            {data.papers.length === 0 && (
+            {displayedStudentPapers.length === 0 && (
               <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-[var(--duo-surface)] px-4 py-8 text-center text-sm font-bold text-[var(--duo-text-muted)]">
                 {data.papers.length === 0 ? "No published papers yet." : "No papers for the selected year."}
               </p>

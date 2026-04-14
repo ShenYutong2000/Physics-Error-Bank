@@ -10,7 +10,10 @@ export default function TeacherHomePage() {
   const [papers, setPapers] = useState<PaperSummary[]>([]);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
-  const [yearFilter, setYearFilter] = useState<string>("all");
+  const [yearFilter, setYearFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("year") ?? "all";
+  });
   const [session, setSession] = useState<ExamSession>("MAY");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -19,9 +22,13 @@ export default function TeacherHomePage() {
     () => Array.from(new Set(papers.map((p) => p.year))).sort((a, b) => b - a),
     [papers],
   );
+  const effectiveYearFilter = useMemo(
+    () => (yearFilter === "all" || availableYears.includes(Number(yearFilter)) ? yearFilter : "all"),
+    [availableYears, yearFilter],
+  );
   const filteredPapers = useMemo(
-    () => (yearFilter === "all" ? papers : papers.filter((p) => String(p.year) === yearFilter)),
-    [papers, yearFilter],
+    () => (effectiveYearFilter === "all" ? papers : papers.filter((p) => String(p.year) === effectiveYearFilter)),
+    [effectiveYearFilter, papers],
   );
 
   async function loadPapers() {
@@ -48,6 +55,19 @@ export default function TeacherHomePage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (effectiveYearFilter === "all") {
+      params.delete("year");
+    } else {
+      params.set("year", effectiveYearFilter);
+    }
+    const query = params.toString();
+    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, [effectiveYearFilter]);
 
   async function createNewPaper() {
     setSaving(true);
@@ -162,7 +182,7 @@ export default function TeacherHomePage() {
           </label>
           <select
             id="teacher-paper-year-filter"
-            value={yearFilter}
+            value={effectiveYearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
             className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
           >
