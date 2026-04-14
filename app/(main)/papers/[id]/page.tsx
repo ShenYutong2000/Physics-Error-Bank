@@ -34,6 +34,12 @@ export default function PaperAttemptPage() {
     accuracy: number;
     wrongQuestions: WrongQuestion[];
     correctTagMastery: TagMasteryRow[];
+    classComparison?: {
+      studentCount: number;
+      attemptCount: number;
+      averageAccuracy: number;
+      classTagMastery: TagMasteryRow[];
+    };
   } | null>(null);
   const [submittedAnswers, setSubmittedAnswers] = useState<
     Array<{
@@ -45,6 +51,19 @@ export default function PaperAttemptPage() {
   >([]);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [themeQuestionCounts, setThemeQuestionCounts] = useState<PaperThemeCountRow[]>([]);
+  const [showOnlyWeakThemes, setShowOnlyWeakThemes] = useState(false);
+  const classMasteryByTag = useMemo(
+    () => new Map((result?.classComparison?.classTagMastery ?? []).map((r) => [r.tag, r])),
+    [result?.classComparison?.classTagMastery],
+  );
+  const displayedThemeComparisonRows = useMemo(() => {
+    const rows = result?.correctTagMastery ?? [];
+    if (!showOnlyWeakThemes) return rows;
+    return rows.filter((row) => {
+      const classPct = classMasteryByTag.get(row.tag)?.masteryPercent ?? 0;
+      return row.masteryPercent < classPct;
+    });
+  }, [classMasteryByTag, result?.correctTagMastery, showOnlyWeakThemes]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -61,6 +80,12 @@ export default function PaperAttemptPage() {
           accuracy: number;
           wrongQuestions: WrongQuestion[];
           correctTagMastery: TagMasteryRow[];
+          classComparison?: {
+            studentCount: number;
+            attemptCount: number;
+            averageAccuracy: number;
+            classTagMastery: TagMasteryRow[];
+          };
           themeQuestionCounts: PaperThemeCountRow[];
           submittedAnswers: Array<{
             questionNumber: number;
@@ -69,6 +94,12 @@ export default function PaperAttemptPage() {
             isCorrect: boolean;
           }>;
         } | null;
+        classComparison?: {
+          studentCount: number;
+          attemptCount: number;
+          averageAccuracy: number;
+          classTagMastery: TagMasteryRow[];
+        };
       }>(
         `/api/papers/${encodeURIComponent(paperId)}`,
         {
@@ -99,6 +130,7 @@ export default function PaperAttemptPage() {
           accuracy: r.data.existingAttempt.accuracy,
           wrongQuestions: r.data.existingAttempt.wrongQuestions,
           correctTagMastery: r.data.existingAttempt.correctTagMastery,
+          classComparison: r.data.classComparison,
         });
         setSubmittedAnswers(r.data.existingAttempt.submittedAnswers);
       } else {
@@ -136,6 +168,12 @@ export default function PaperAttemptPage() {
       wrongQuestions: WrongQuestion[];
       correctTagMastery: TagMasteryRow[];
       themeQuestionCounts: PaperThemeCountRow[];
+      classComparison?: {
+        studentCount: number;
+        attemptCount: number;
+        averageAccuracy: number;
+        classTagMastery: TagMasteryRow[];
+      };
     }>(`/api/papers/${encodeURIComponent(paperId)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -267,6 +305,11 @@ export default function PaperAttemptPage() {
             <p className="text-sm font-bold text-[var(--duo-text-muted)]">
               Wrong: {result.wrongCount}
             </p>
+            {result.classComparison && (
+              <p className="mt-1 text-sm font-bold text-[var(--duo-text-muted)]">
+                Class avg: {result.classComparison.averageAccuracy}% ({result.classComparison.studentCount} students)
+              </p>
+            )}
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <PaperThemeBreakdownTable
@@ -285,6 +328,64 @@ export default function PaperAttemptPage() {
               emptyMessage="No answers yet."
               ariaLabel="Bar chart of mastery rate per syllabus theme"
             />
+          </div>
+          <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#faf6ff] via-white to-[#fff9ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-extrabold text-[var(--duo-text)]">This paper: you vs class by theme</h2>
+              <span className="text-[11px] font-bold text-[#6b5a95]">Delta = you - class</span>
+            </div>
+            <label className="mb-3 flex items-center gap-2 text-xs font-bold text-[var(--duo-text-muted)]">
+              <input
+                type="checkbox"
+                checked={showOnlyWeakThemes}
+                onChange={(e) => setShowOnlyWeakThemes(e.target.checked)}
+                className="h-4 w-4 accent-[#7a84ff]"
+              />
+              Only show weak themes (below class baseline)
+            </label>
+            {(result.classComparison?.classTagMastery ?? []).length === 0 ? (
+              <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-white px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+                Class comparison will appear when submissions are available.
+              </p>
+            ) : displayedThemeComparisonRows.length === 0 ? (
+              <p className="rounded-xl border-2 border-dashed border-[var(--duo-border)] bg-white px-4 py-6 text-center text-sm font-bold text-[var(--duo-text-muted)]">
+                {showOnlyWeakThemes
+                  ? "Great work. No weak themes below class baseline on this paper."
+                  : "No theme comparison data yet."}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {displayedThemeComparisonRows.map((row) => {
+                  const classPct = classMasteryByTag.get(row.tag)?.masteryPercent ?? 0;
+                  const delta = Number((row.masteryPercent - classPct).toFixed(1));
+                  const deltaClass =
+                    delta >= 10
+                      ? "border-[#c92a2a] bg-[#ffe8e8] text-[#b42318]"
+                      : delta >= 3
+                        ? "border-[#e67700] bg-[#fff4e5] text-[#a65b00]"
+                        : delta <= -10
+                          ? "border-[#2b8a3e] bg-[#e6f9ec] text-[#1f6f31]"
+                          : delta <= -3
+                            ? "border-[#2f9e44] bg-[#f0fff4] text-[#2b8a3e]"
+                            : "border-[#b6d4fe] bg-[#eef6ff] text-[#1c6ed6]";
+                  return (
+                    <div key={row.tag} className="rounded-lg border border-[#eadfff] bg-white px-2 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-extrabold text-[var(--duo-text)]">{row.tag}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold tabular-nums ${deltaClass}`}>
+                          {delta >= 0 ? "+" : ""}
+                          {delta}%
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-[#6b5a95]">You {row.masteryPercent}%</span>
+                        <span className="text-[var(--duo-text-muted)]">Class {classPct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Wrong questions</h2>
