@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "db:clear-all": "tsx scripts/clear-all-accounts.ts",
     "db:clear-papers": "tsx scripts/clear-all-papers.ts",
+    "db:delete-user": "tsx scripts/delete-user-by-email.ts",
     "teacher:add": "tsx scripts/add-teacher-email.ts",
     "branding:apple-cutout": "tsx scripts/cutout-apple-logo.ts",
     "postinstall": "prisma generate"

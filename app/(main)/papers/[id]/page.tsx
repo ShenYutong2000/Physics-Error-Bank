@@ -18,6 +18,32 @@ type WrongQuestion = {
 
 const CHOICES: ChoiceOption[] = ["A", "B", "C", "D", "BLANK"];
 
+function buildSubmittedAnswersFromResult(
+  questions: Array<{ number: number }>,
+  answers: Record<number, ChoiceOption>,
+  wrongQuestions: WrongQuestion[],
+) {
+  const wrongByQ = new Map(wrongQuestions.map((w) => [w.questionNumber, w]));
+  return questions.map((q) => {
+    const w = wrongByQ.get(q.number);
+    if (w) {
+      return {
+        questionNumber: q.number,
+        answer: w.studentAnswer,
+        correctAnswer: w.correctAnswer,
+        isCorrect: false,
+      };
+    }
+    const answer = answers[q.number] ?? "BLANK";
+    return {
+      questionNumber: q.number,
+      answer,
+      correctAnswer: answer,
+      isCorrect: true,
+    };
+  });
+}
+
 export default function PaperAttemptPage() {
   const params = useParams<{ id: string }>();
   const paperId = String(params.id ?? "");
@@ -173,6 +199,8 @@ export default function PaperAttemptPage() {
       setError(r.error);
       return;
     }
+    setAlreadySubmitted(true);
+    setSubmittedAnswers(buildSubmittedAnswersFromResult(questions, answers, r.data.wrongQuestions));
     setResult(r.data);
     setThemeQuestionCounts(r.data.themeQuestionCounts ?? []);
   }
