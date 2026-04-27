@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { mainPageClassName } from "@/components/main-page-layout";
+import { PaperModeToggle } from "@/components/paper-mode-toggle";
 import { DEFAULT_PAPER_QUESTION_COUNT, type ExamSession, type PaperSummary } from "@/lib/paper-types";
 
 type PrepScope = "all" | "dp1";
@@ -144,23 +145,35 @@ export default function TeacherHomePage() {
 
   return (
     <div className={mainPageClassName}>
-      <header className="mb-5">
-        <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
-        <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Shared paper bank</h1>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Link
-            href="/teacher/papers-overview"
-            className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
-          >
-            All papers — stats & theme mastery →
-          </Link>
-          <Link
-            href="/teacher/mistakes"
-            className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
-          >
-            Class mistake analytics →
-          </Link>
+      <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
+          <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Shared paper bank</h1>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Link
+              href="/teacher/papers-overview"
+              className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
+            >
+              All papers — stats & theme mastery →
+            </Link>
+            <Link
+              href="/teacher/mistakes"
+              className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
+            >
+              Class mistake analytics →
+            </Link>
+          </div>
         </div>
+        <PaperModeToggle
+          value={prepScope}
+          onChange={setPrepScope}
+          className="lg:ml-auto"
+          summaryText={
+            prepScope === "dp1"
+              ? "Showing only DP1 EOY Exam Prep papers. Useful for quick DP1 planning."
+              : "Showing all draft and published papers."
+          }
+        />
       </header>
       {error && (
         <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
@@ -211,38 +224,6 @@ export default function TeacherHomePage() {
       </section>
 
       <section className="space-y-3">
-        <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-3 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]">
-          <p className="text-xs font-extrabold uppercase tracking-wide text-[#5f4f8f]">Paper mode</p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setPrepScope("all")}
-              className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black ${
-                prepScope === "all"
-                  ? "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
-                  : "border-[var(--duo-border)] bg-white text-[var(--duo-text)]"
-              }`}
-            >
-              All papers
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrepScope("dp1")}
-              className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black ${
-                prepScope === "dp1"
-                  ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
-                  : "border-[#d8c9ff] bg-white text-[#5f4f8f]"
-              }`}
-            >
-              DP1 only (Themes A-C)
-            </button>
-          </div>
-          <p className="mt-2 text-xs font-bold text-[#5f4f8f]">
-            {prepScope === "dp1"
-              ? "Showing only DP1 EOY Exam Prep papers. Useful for quick DP1 planning."
-              : "Showing all draft and published papers."}
-          </p>
-        </div>
         <div className="max-w-xs">
           <label htmlFor="teacher-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
             Filter by year
