@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetchJson } from "@/lib/api-client";
 import { TagStatsChart } from "@/components/tag-stats-chart";
+import { PaperModeToggle } from "@/components/paper-mode-toggle";
 import type { PublishedPaperStatsRow, TagMasteryRow } from "@/lib/paper-types";
 
 type MasteryScope = "self" | "class" | "student";
@@ -298,96 +299,17 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
 
   return (
     <div className="space-y-6">
-      {/* Sticky below MainShell header (z-40); top-24 clears tall mobile headers (stacked header actions) */}
-      <div className="sticky top-24 z-30 -mx-4 border-b-2 border-[var(--duo-border)] bg-[#f8faff]/95 px-4 py-3 backdrop-blur-sm sm:top-20 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="mx-auto w-full max-w-7xl">
-          <p className="text-sm font-extrabold text-[var(--duo-text)] sm:text-base">Statistics range</p>
-          <p className="mt-0.5 text-xs font-bold text-[#5f4f8f] sm:text-sm">
-            Choose whether numbers include every published paper or only DP1 EOY Exam Prep (Themes A–C).
-          </p>
-          <div
-            className="mt-3 flex min-h-[3.25rem] w-full flex-col gap-2 sm:min-h-0 sm:flex-row sm:gap-2"
-            role="group"
-            aria-label="Statistics range"
-          >
-            <button
-              type="button"
-              onClick={() => setPrepScope("all")}
-              disabled={loading}
-              aria-pressed={prepScope === "all"}
-              className={`flex flex-1 flex-col items-stretch justify-center rounded-2xl border-2 px-4 py-3 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)] disabled:opacity-60 sm:py-3.5 ${
-                prepScope === "all"
-                  ? "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
-                  : "border-[#c4c4e8] bg-white/90 text-[var(--duo-text)] hover:border-[#9ca3e8]"
-              }`}
-            >
-              <span
-                className={`text-sm font-black uppercase tracking-wide sm:text-base ${
-                  prepScope === "all" ? "text-white" : "text-[#4a56c7]"
-                }`}
-              >
-                All published papers
-              </span>
-              <span
-                className={`mt-0.5 text-xs font-bold sm:text-sm ${
-                  prepScope === "all" ? "text-white/95" : "text-[var(--duo-text-muted)]"
-                }`}
-              >
-                Full class bank & all themes
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrepScope("dp1")}
-              disabled={loading}
-              aria-pressed={prepScope === "dp1"}
-              className={`relative flex flex-1 flex-col items-stretch justify-center overflow-hidden rounded-2xl border-2 px-4 py-3 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)] disabled:opacity-60 sm:py-3.5 ${
-                prepScope === "dp1"
-                  ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
-                  : "border-[#d8b8ff] bg-gradient-to-br from-[#faf5ff] to-white text-[var(--duo-text)] hover:border-[#b388ff]"
-              }`}
-            >
-              {prepScope === "dp1" && (
-                <span
-                  className="absolute right-2 top-2 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white"
-                  aria-hidden
-                >
-                  Active
-                </span>
-              )}
-              <span
-                className={`text-sm font-black uppercase tracking-wide sm:text-base ${
-                  prepScope === "dp1" ? "pr-12 text-white" : "text-[#6d28d9]"
-                }`}
-              >
-                DP1 EOY exam prep
-              </span>
-              <span
-                className={`mt-0.5 text-xs font-bold sm:text-sm ${
-                  prepScope === "dp1" ? "text-white/95" : "text-[var(--duo-text-muted)]"
-                }`}
-              >
-                Marked papers · Themes A–C only
-              </span>
-            </button>
-          </div>
-          <p className="mt-2 text-xs font-bold text-[#5f4f8f] sm:text-sm">
-            {prepScope === "dp1"
-              ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep; mastery and scores use Themes A–C only (D/E/M excluded)."
-              : "All mode includes every published paper and all theme tags you see elsewhere."}
-          </p>
-          {prepScope === "dp1" && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2.5 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
-              <span className="text-lg" aria-hidden>
-                ✓
-              </span>
-              <div>
-                <p className="text-sm font-black uppercase tracking-wider sm:text-base">DP1 EOY view active</p>
-                <p className="text-xs font-bold text-white/95 sm:text-sm">Themes A–C only in charts and scores.</p>
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="flex justify-end">
+        <PaperModeToggle
+          value={prepScope}
+          onChange={setPrepScope}
+          disabled={loading}
+          summaryText={
+            prepScope === "dp1"
+              ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep; mastery and scores use Themes A-C only."
+              : "All mode includes every published paper."
+          }
+        />
       </div>
       {variant === "teacher" && (
         <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">

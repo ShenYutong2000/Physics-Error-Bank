@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { mainPageClassName } from "@/components/main-page-layout";
+import { PaperModeToggle } from "@/components/paper-mode-toggle";
 import type { PaperSummary } from "@/lib/paper-types";
 
 type PrepScope = "all" | "dp1";
@@ -103,43 +104,22 @@ export default function PapersPage() {
         </span>
       </Link>
 
-      <header className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">Past papers</p>
-        <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Choose a paper</h1>
-        <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
-          Enter A/B/C/D answers for each question, submit, and review your wrong-tag distribution.
-        </p>
-        <div className="mt-4 rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-3 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]">
-          <p className="text-xs font-extrabold uppercase tracking-wide text-[#5f4f8f]">Paper mode</p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setPrepScope("all")}
-              className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black ${
-                prepScope === "all"
-                  ? "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
-                  : "border-[var(--duo-border)] bg-white text-[var(--duo-text)]"
-              }`}
-            >
-              All papers
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrepScope("dp1")}
-              className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black ${
-                prepScope === "dp1"
-                  ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
-                  : "border-[#d8c9ff] bg-white text-[#5f4f8f]"
-              }`}
-            >
-              DP1 only (Themes A-C)
-            </button>
-          </div>
-          <p className="mt-2 text-xs font-bold text-[#5f4f8f]">
-            {prepScope === "dp1" ? "Showing only DP1 EOY Exam Prep papers." : "Showing all published papers."}
+      <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--duo-blue)]">Past papers</p>
+          <h1 className="mt-1 text-2xl font-extrabold text-[var(--duo-text)]">Choose a paper</h1>
+          <p className="mt-2 text-sm font-medium text-[var(--duo-text-muted)]">
+            Enter A/B/C/D answers for each question, submit, and review your wrong-tag distribution.
           </p>
         </div>
-        <div className="mt-3 max-w-xs">
+        <PaperModeToggle
+          value={prepScope}
+          onChange={setPrepScope}
+          className="lg:ml-auto"
+          summaryText={prepScope === "dp1" ? "Showing only DP1 EOY Exam Prep papers." : "Showing all published papers."}
+        />
+      </header>
+      <div className="mb-6 mt-3 max-w-xs">
           <label htmlFor="student-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
             Filter by year
           </label>
@@ -156,8 +136,7 @@ export default function PapersPage() {
               </option>
             ))}
           </select>
-        </div>
-      </header>
+      </div>
       {loading && <p className="text-sm font-bold text-[var(--duo-text-muted)]">Loading papers...</p>}
       {error && (
         <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
