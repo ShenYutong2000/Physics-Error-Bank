@@ -15,6 +15,7 @@ export default function TeacherHomePage() {
     return new URLSearchParams(window.location.search).get("year") ?? "all";
   });
   const [session, setSession] = useState<ExamSession>("MAY");
+  const [dp1AtoCOnly, setDp1AtoCOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [clearAllSubmissionsBusy, setClearAllSubmissionsBusy] = useState(false);
@@ -75,7 +76,13 @@ export default function TeacherHomePage() {
     const r = await apiFetchJson<{ paper: PaperSummary }>("/api/teacher/papers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, year, session, questionCount: DEFAULT_PAPER_QUESTION_COUNT }),
+      body: JSON.stringify({
+        title,
+        year,
+        session,
+        questionCount: DEFAULT_PAPER_QUESTION_COUNT,
+        dp1AtoCOnly,
+      }),
     });
     setSaving(false);
     if (!r.ok) {
@@ -83,6 +90,7 @@ export default function TeacherHomePage() {
       return;
     }
     setTitle("");
+    setDp1AtoCOnly(false);
     await loadPapers();
   }
 
@@ -165,6 +173,15 @@ export default function TeacherHomePage() {
             <option value="NOV">NOV</option>
           </select>
         </div>
+        <label className="mb-3 flex items-center gap-2 rounded-xl border-2 border-[#d8c9ff] bg-[#f8f3ff] px-3 py-2 text-xs font-bold text-[#5f4f8f]">
+          <input
+            type="checkbox"
+            checked={dp1AtoCOnly}
+            onChange={(e) => setDp1AtoCOnly(e.target.checked)}
+            className="h-4 w-4"
+          />
+          DP1 EOY Exam Prep (score and mastery only count Themes A-C)
+        </label>
         <button
           type="button"
           onClick={() => void createNewPaper()}
@@ -207,6 +224,9 @@ export default function TeacherHomePage() {
             <p className="mt-1 text-xs font-bold text-[var(--duo-blue)]">
               {paper.publishedAt ? "Published" : "Draft"}
             </p>
+            {paper.dp1AtoCOnly && (
+              <p className="mt-1 text-xs font-extrabold text-[#7d4cc9]">DP1 EOY Exam Prep · Themes A-C only</p>
+            )}
           </Link>
         ))}
         {filteredPapers.length === 0 && (

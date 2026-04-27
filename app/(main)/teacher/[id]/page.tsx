@@ -59,6 +59,7 @@ type AnalyticsResponse = {
     year: number;
     session: "MAY" | "NOV";
     questionCount: number;
+    dp1AtoCOnly: boolean;
     publishedAt: string | null;
   };
   themeQuestionCounts: PaperThemeCountRow[];
@@ -321,6 +322,11 @@ export default function TeacherPaperDetailPage() {
           {analytics ? `${analytics.paper.year} ${analytics.paper.session}` : "Loading..."}
         </h1>
         {analytics && <p className="text-sm font-bold text-[var(--duo-text-muted)]">{analytics.paper.title}</p>}
+        {analytics?.paper.dp1AtoCOnly && (
+          <p className="mt-1 text-xs font-extrabold text-[#7d4cc9]">
+            DP1 EOY Exam Prep enabled: only Themes A-C count in score/mastery analytics.
+          </p>
+        )}
       </header>
       {error && (
         <div className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
