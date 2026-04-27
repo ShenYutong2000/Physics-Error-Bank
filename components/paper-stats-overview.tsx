@@ -298,58 +298,96 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
 
   return (
     <div className="space-y-6">
-      <button
-        type="button"
-        onClick={() => setPrepScope(prepScope === "dp1" ? "all" : "dp1")}
-        className={`fixed right-3 top-3 z-50 rounded-xl border-2 px-3 py-2 text-left shadow-[0_6px_0_0_rgba(0,0,0,0.18)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.18)] sm:right-5 sm:top-5 ${
-          prepScope === "dp1"
-            ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
-            : "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
-        }`}
-        title={prepScope === "dp1" ? "Switch back to all published papers" : "Switch to DP1 EOY papers only"}
-        aria-label={
-          prepScope === "dp1"
-            ? "DP1 mode is active. Click to switch to all published papers."
-            : "All papers mode is active. Click to switch to DP1 papers only."
-        }
-      >
-        {prepScope === "dp1" ? (
-          <>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em]">DP1 Mode</p>
-            <p className="text-[10px] font-bold text-white/95">Themes A-C only · Click to show all</p>
-          </>
-        ) : (
-          <>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em]">All Papers Mode</p>
-            <p className="text-[10px] font-bold text-white/95">Click to switch to DP1 (A-C only)</p>
-          </>
-        )}
-      </button>
-      <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
-        <label className="mb-2 block text-sm font-extrabold text-[var(--duo-text)]" htmlFor="paper-stats-prep-scope">
-          Statistics range
-        </label>
-        <select
-          id="paper-stats-prep-scope"
-          value={prepScope}
-          onChange={(e) => setPrepScope(e.target.value as PrepScope)}
-          className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
-          disabled={loading}
-        >
-          <option value="all">All published papers</option>
-          <option value="dp1">DP1 EOY Exam Prep only (Themes A-C)</option>
-        </select>
-        <p className="mt-2 text-xs font-bold text-[#5f4f8f]">
-          {prepScope === "dp1"
-            ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep, and mastery counts Themes A-C only."
-            : "All mode includes every published paper."}
-        </p>
-        {prepScope === "dp1" && (
-          <div className="mt-3 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
-            <p className="text-xs font-black uppercase tracking-widest">DP1 EOY Exam Prep Active</p>
-            <p className="text-xs font-bold text-white/95">Themes A-C only · D/E/M excluded from mastery and score.</p>
+      {/* Sticky below MainShell header (z-40); top-24 clears tall mobile headers (stacked header actions) */}
+      <div className="sticky top-24 z-30 -mx-4 border-b-2 border-[var(--duo-border)] bg-[#f8faff]/95 px-4 py-3 backdrop-blur-sm sm:top-20 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <p className="text-sm font-extrabold text-[var(--duo-text)] sm:text-base">Statistics range</p>
+          <p className="mt-0.5 text-xs font-bold text-[#5f4f8f] sm:text-sm">
+            Choose whether numbers include every published paper or only DP1 EOY Exam Prep (Themes A–C).
+          </p>
+          <div
+            className="mt-3 flex min-h-[3.25rem] w-full flex-col gap-2 sm:min-h-0 sm:flex-row sm:gap-2"
+            role="group"
+            aria-label="Statistics range"
+          >
+            <button
+              type="button"
+              onClick={() => setPrepScope("all")}
+              disabled={loading}
+              aria-pressed={prepScope === "all"}
+              className={`flex flex-1 flex-col items-stretch justify-center rounded-2xl border-2 px-4 py-3 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)] disabled:opacity-60 sm:py-3.5 ${
+                prepScope === "all"
+                  ? "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
+                  : "border-[#c4c4e8] bg-white/90 text-[var(--duo-text)] hover:border-[#9ca3e8]"
+              }`}
+            >
+              <span
+                className={`text-sm font-black uppercase tracking-wide sm:text-base ${
+                  prepScope === "all" ? "text-white" : "text-[#4a56c7]"
+                }`}
+              >
+                All published papers
+              </span>
+              <span
+                className={`mt-0.5 text-xs font-bold sm:text-sm ${
+                  prepScope === "all" ? "text-white/95" : "text-[var(--duo-text-muted)]"
+                }`}
+              >
+                Full class bank & all themes
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrepScope("dp1")}
+              disabled={loading}
+              aria-pressed={prepScope === "dp1"}
+              className={`relative flex flex-1 flex-col items-stretch justify-center overflow-hidden rounded-2xl border-2 px-4 py-3 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.12)] disabled:opacity-60 sm:py-3.5 ${
+                prepScope === "dp1"
+                  ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
+                  : "border-[#d8b8ff] bg-gradient-to-br from-[#faf5ff] to-white text-[var(--duo-text)] hover:border-[#b388ff]"
+              }`}
+            >
+              {prepScope === "dp1" && (
+                <span
+                  className="absolute right-2 top-2 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white"
+                  aria-hidden
+                >
+                  Active
+                </span>
+              )}
+              <span
+                className={`text-sm font-black uppercase tracking-wide sm:text-base ${
+                  prepScope === "dp1" ? "pr-12 text-white" : "text-[#6d28d9]"
+                }`}
+              >
+                DP1 EOY exam prep
+              </span>
+              <span
+                className={`mt-0.5 text-xs font-bold sm:text-sm ${
+                  prepScope === "dp1" ? "text-white/95" : "text-[var(--duo-text-muted)]"
+                }`}
+              >
+                Marked papers · Themes A–C only
+              </span>
+            </button>
           </div>
-        )}
+          <p className="mt-2 text-xs font-bold text-[#5f4f8f] sm:text-sm">
+            {prepScope === "dp1"
+              ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep; mastery and scores use Themes A–C only (D/E/M excluded)."
+              : "All mode includes every published paper and all theme tags you see elsewhere."}
+          </p>
+          {prepScope === "dp1" && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2.5 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
+              <span className="text-lg" aria-hidden>
+                ✓
+              </span>
+              <div>
+                <p className="text-sm font-black uppercase tracking-wider sm:text-base">DP1 EOY view active</p>
+                <p className="text-xs font-bold text-white/95 sm:text-sm">Themes A–C only in charts and scores.</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       {variant === "teacher" && (
         <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
