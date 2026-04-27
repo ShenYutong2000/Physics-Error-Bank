@@ -7,12 +7,20 @@ import { TagStatsChart } from "@/components/tag-stats-chart";
 import type { PublishedPaperStatsRow, TagMasteryRow } from "@/lib/paper-types";
 
 type MasteryScope = "self" | "class" | "student";
+type PrepScope = "all" | "dp1";
+type ThemeMasteryRow = { tag: string; correct: number; total: number; masteryPercent: number };
+const DP1_THEME_ORDER = [
+  "Theme A - Space, Time, and Motion",
+  "Theme B - The Particulate Nature of Matter",
+  "Theme C - Wave Behavior",
+] as const;
 
 type StatsPayload = {
   papers: PublishedPaperStatsRow[];
   crossPaperThemeMastery: TagMasteryRow[];
   classCrossPaperThemeMastery?: TagMasteryRow[];
   masteryScope: MasteryScope;
+  prepScope?: PrepScope;
   selectedStudent?: { userId: string; name: string; email: string };
   students?: Array<{ id: string; name: string; email: string }>;
 };
@@ -36,6 +44,11 @@ function masteryBand(percent: number): "high" | "medium" | "low" {
   if (percent >= 80) return "high";
   if (percent >= 50) return "medium";
   return "low";
+}
+
+function toDp1OrderedRows(rows: ThemeMasteryRow[]): ThemeMasteryRow[] {
+  const map = new Map(rows.map((r) => [r.tag, r]));
+  return DP1_THEME_ORDER.map((theme) => map.get(theme)).filter((r): r is ThemeMasteryRow => Boolean(r));
 }
 
 export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "teacher" }) {
@@ -64,6 +77,10 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   });
   const [studentVisibleCount, setStudentVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
   const [teacherVisibleCount, setTeacherVisibleCount] = useState(INITIAL_VISIBLE_PAPERS);
+  const [prepScope, setPrepScope] = useState<PrepScope>(() => {
+    if (typeof window === "undefined") return "all";
+    return new URLSearchParams(window.location.search).get("prep") === "dp1" ? "dp1" : "all";
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +88,10 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
       setLoading(true);
       setError(null);
       if (variant === "teacher") {
-        const classResp = await apiFetchJson<StatsPayload>("/api/papers/stats", { timeoutMs: 12_000 });
+        const classResp = await apiFetchJson<StatsPayload>(
+          `/api/papers/stats?prep=${encodeURIComponent(prepScope)}`,
+          { timeoutMs: 12_000 },
+        );
         if (cancelled) return;
         if (!classResp.ok) {
           if (classResp.error === "Request cancelled.") return;
@@ -90,7 +110,9 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
         return;
       }
 
-      const r = await apiFetchJson<StatsPayload>("/api/papers/stats", { timeoutMs: 12_000 });
+      const r = await apiFetchJson<StatsPayload>(`/api/papers/stats?prep=${encodeURIComponent(prepScope)}`, {
+        timeoutMs: 12_000,
+      });
       if (cancelled) return;
       setLoading(false);
       if (!r.ok) {
@@ -105,7 +127,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     return () => {
       cancelled = true;
     };
-  }, [studentId, variant]);
+  }, [studentId, prepScope, variant]);
 
   useEffect(() => {
     if (variant !== "teacher" || !teacherData.classData || !studentId.trim()) return;
@@ -114,7 +136,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
       setSelectedLoading(true);
       setError(null);
       const selectedResp = await apiFetchJson<StatsPayload>(
-        `/api/papers/stats?studentId=${encodeURIComponent(studentId.trim())}`,
+        `/api/papers/stats?studentId=${encodeURIComponent(studentId.trim())}&prep=${encodeURIComponent(prepScope)}`,
         { timeoutMs: 12_000 },
       );
       if (cancelled) return;
@@ -130,7 +152,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     return () => {
       cancelled = true;
     };
-  }, [studentId, teacherData.classData, variant]);
+  }, [studentId, teacherData.classData, prepScope, variant]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -146,10 +168,15 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     } else {
       params.set("sort", studentPaperSort);
     }
+    if (prepScope === "all") {
+      params.delete("prep");
+    } else {
+      params.set("prep", prepScope);
+    }
     const query = params.toString();
     const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
     window.history.replaceState(null, "", path);
-  }, [studentPaperSort, studentYearFilter, variant]);
+  }, [prepScope, studentPaperSort, studentYearFilter, variant]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -165,20 +192,54 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
     } else {
       params.set("studentId", studentId.trim());
     }
+    if (prepScope === "all") {
+      params.delete("prep");
+    } else {
+      params.set("prep", prepScope);
+    }
     const query = params.toString();
     const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
     window.history.replaceState(null, "", path);
-  }, [studentId, teacherYearFilter, variant]);
+  }, [prepScope, studentId, teacherYearFilter, variant]);
+
+  const displayedStudentMasteryRows = useMemo(
+    () =>
+      prepScope === "dp1"
+        ? toDp1OrderedRows((data?.crossPaperThemeMastery ?? []) as ThemeMasteryRow[])
+        : (data?.crossPaperThemeMastery ?? []),
+    [data?.crossPaperThemeMastery, prepScope],
+  );
+  const displayedClassMasteryRowsForStudentView = useMemo(
+    () =>
+      prepScope === "dp1"
+        ? toDp1OrderedRows((data?.classCrossPaperThemeMastery ?? []) as ThemeMasteryRow[])
+        : (data?.classCrossPaperThemeMastery ?? []),
+    [data?.classCrossPaperThemeMastery, prepScope],
+  );
+  const displayedTeacherClassMasteryRows = useMemo(
+    () =>
+      prepScope === "dp1"
+        ? toDp1OrderedRows((teacherData.classData?.crossPaperThemeMastery ?? []) as ThemeMasteryRow[])
+        : (teacherData.classData?.crossPaperThemeMastery ?? []),
+    [prepScope, teacherData.classData?.crossPaperThemeMastery],
+  );
+  const displayedTeacherSelectedMasteryRows = useMemo(
+    () =>
+      prepScope === "dp1"
+        ? toDp1OrderedRows((teacherData.selectedData?.crossPaperThemeMastery ?? []) as ThemeMasteryRow[])
+        : (teacherData.selectedData?.crossPaperThemeMastery ?? []),
+    [prepScope, teacherData.selectedData?.crossPaperThemeMastery],
+  );
 
   const studentMasterySummary = useMemo(() => {
-    const rows = data?.crossPaperThemeMastery ?? [];
+    const rows = displayedStudentMasteryRows;
     const high = rows.filter((r) => masteryBand(r.masteryPercent) === "high").length;
     const medium = rows.filter((r) => masteryBand(r.masteryPercent) === "medium").length;
     const low = rows.filter((r) => masteryBand(r.masteryPercent) === "low").length;
     const weakest = [...rows].sort((a, b) => a.masteryPercent - b.masteryPercent).slice(0, 3);
     const strongest = [...rows].sort((a, b) => b.masteryPercent - a.masteryPercent).slice(0, 2);
     return { high, medium, low, weakest, strongest };
-  }, [data?.crossPaperThemeMastery]);
+  }, [displayedStudentMasteryRows]);
 
   const studentAvailableYears = useMemo(
     () => Array.from(new Set((data?.papers ?? []).map((p) => p.paper.year))).sort((a, b) => b - a),
@@ -237,6 +298,59 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
 
   return (
     <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => setPrepScope(prepScope === "dp1" ? "all" : "dp1")}
+        className={`fixed right-3 top-3 z-50 rounded-xl border-2 px-3 py-2 text-left shadow-[0_6px_0_0_rgba(0,0,0,0.18)] transition-transform active:translate-y-0.5 active:shadow-[0_2px_0_0_rgba(0,0,0,0.18)] sm:right-5 sm:top-5 ${
+          prepScope === "dp1"
+            ? "border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] text-white"
+            : "border-[#4a56c7] bg-gradient-to-r from-[#5d6bff] via-[#7a84ff] to-[#4a56c7] text-white"
+        }`}
+        title={prepScope === "dp1" ? "Switch back to all published papers" : "Switch to DP1 EOY papers only"}
+        aria-label={
+          prepScope === "dp1"
+            ? "DP1 mode is active. Click to switch to all published papers."
+            : "All papers mode is active. Click to switch to DP1 papers only."
+        }
+      >
+        {prepScope === "dp1" ? (
+          <>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]">DP1 Mode</p>
+            <p className="text-[10px] font-bold text-white/95">Themes A-C only · Click to show all</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]">All Papers Mode</p>
+            <p className="text-[10px] font-bold text-white/95">Click to switch to DP1 (A-C only)</p>
+          </>
+        )}
+      </button>
+      <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        <label className="mb-2 block text-sm font-extrabold text-[var(--duo-text)]" htmlFor="paper-stats-prep-scope">
+          Statistics range
+        </label>
+        <select
+          id="paper-stats-prep-scope"
+          value={prepScope}
+          onChange={(e) => setPrepScope(e.target.value as PrepScope)}
+          className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-bold"
+          disabled={loading}
+        >
+          <option value="all">All published papers</option>
+          <option value="dp1">DP1 EOY Exam Prep only (Themes A-C)</option>
+        </select>
+        <p className="mt-2 text-xs font-bold text-[#5f4f8f]">
+          {prepScope === "dp1"
+            ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep, and mastery counts Themes A-C only."
+            : "All mode includes every published paper."}
+        </p>
+        {prepScope === "dp1" && (
+          <div className="mt-3 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
+            <p className="text-xs font-black uppercase tracking-widest">DP1 EOY Exam Prep Active</p>
+            <p className="text-xs font-bold text-white/95">Themes A-C only · D/E/M excluded from mastery and score.</p>
+          </div>
+        )}
+      </div>
       {variant === "teacher" && (
         <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <label className="mb-2 block text-sm font-extrabold text-[var(--duo-text)]" htmlFor="paper-stats-student">
@@ -281,9 +395,18 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
               <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (baseline)</h2>
-              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Always class aggregate across all published papers.</p>
+              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">
+                {prepScope === "dp1"
+                  ? "Class aggregate across DP1 EOY papers only."
+                  : "Always class aggregate across all published papers."}
+              </p>
+              {prepScope === "dp1" && (
+                <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                  DP1 only · Themes A-C
+                </span>
+              )}
               <TagStatsChart
-                rows={teacherData.classData.crossPaperThemeMastery}
+                rows={displayedTeacherClassMasteryRows}
                 emptyMessage="No student answers on published papers yet."
                 ariaLabel="Class theme mastery across published papers"
               />
@@ -302,11 +425,18 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                   Loading selected student…
                 </div>
               ) : teacherData.selectedData ? (
+                <>
+                  {prepScope === "dp1" && (
+                    <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                      DP1 only · Themes A-C
+                    </span>
+                  )}
                 <TagStatsChart
-                  rows={teacherData.selectedData.crossPaperThemeMastery}
+                  rows={displayedTeacherSelectedMasteryRows}
                   emptyMessage="This student has no published-paper answers yet."
                   ariaLabel="Selected student theme mastery across published papers"
                 />
+                </>
               ) : (
                 <div className="rounded-2xl border-2 border-dashed border-[#d8c9ff] bg-white px-4 py-8 text-center text-sm font-medium text-[var(--duo-text-muted)]">
                   No student selected.
@@ -318,7 +448,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-extrabold text-[var(--duo-text)]">
-                All published papers — question results (class)
+                {prepScope === "dp1" ? "DP1 EOY papers — question results (class)" : "All published papers — question results (class)"}
               </h2>
               <select
                 value={effectiveTeacherYearFilter}
@@ -373,7 +503,9 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           <section className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Your learning snapshot</h2>
             <p className="mt-1 text-xs font-bold text-[#6b5a95]">
-              Quick view of current theme mastery bands and what to revise first.
+              {prepScope === "dp1"
+                ? "Quick view of your DP1 EOY (Themes A-C) mastery bands and what to revise first."
+                : "Quick view of current theme mastery bands and what to revise first."}
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="rounded-xl border-2 border-[#b8f2c2] bg-[#ecfff1] px-3 py-2 text-sm font-bold text-[#1f6f31]">
@@ -412,9 +544,18 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
               <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (baseline)</h2>
-              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Class aggregate across all published papers.</p>
+              <p className="mb-3 text-xs font-bold text-[#5c6b7a]">
+                {prepScope === "dp1"
+                  ? "Class aggregate across DP1 EOY papers only."
+                  : "Class aggregate across all published papers."}
+              </p>
+              {prepScope === "dp1" && (
+                <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                  DP1 only · Themes A-C
+                </span>
+              )}
               <TagStatsChart
-                rows={data.classCrossPaperThemeMastery ?? []}
+                rows={displayedClassMasteryRowsForStudentView}
                 emptyMessage="Class baseline will appear after students submit published papers."
                 ariaLabel="Class theme mastery across published papers"
               />
@@ -427,8 +568,13 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
                 )}
               </h2>
               <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Your results, aligned with the same theme order as class.</p>
+              {prepScope === "dp1" && (
+                <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                  DP1 only · Themes A-C
+                </span>
+              )}
               <TagStatsChart
-                rows={data.crossPaperThemeMastery}
+                rows={displayedStudentMasteryRows}
                 emptyMessage="Complete at least one published paper to see your theme mastery."
                 ariaLabel="Your theme mastery across published papers"
               />
@@ -438,7 +584,7 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-extrabold text-[var(--duo-text)]">
-                All published papers — question results (class)
+                {prepScope === "dp1" ? "DP1 EOY papers — question results (class)" : "All published papers — question results (class)"}
               </h2>
               <div className="flex items-center gap-2">
                 <select

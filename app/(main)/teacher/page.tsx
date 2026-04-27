@@ -225,7 +225,9 @@ export default function TeacherHomePage() {
               {paper.publishedAt ? "Published" : "Draft"}
             </p>
             {paper.dp1AtoCOnly && (
-              <p className="mt-1 text-xs font-extrabold text-[#7d4cc9]">DP1 EOY Exam Prep · Themes A-C only</p>
+              <span className="mt-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                DP1 only · Themes A-C
+              </span>
             )}
           </Link>
         ))}

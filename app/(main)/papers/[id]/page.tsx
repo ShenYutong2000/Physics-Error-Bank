@@ -15,6 +15,17 @@ type WrongQuestion = {
   correctAnswer: ChoiceOption;
   theme: string;
 };
+type ThemeMasteryRow = { tag: string; correct: number; total: number; masteryPercent: number };
+const DP1_THEME_ORDER = [
+  "Theme A - Space, Time, and Motion",
+  "Theme B - The Particulate Nature of Matter",
+  "Theme C - Wave Behavior",
+] as const;
+
+function toDp1OrderedRows(rows: ThemeMasteryRow[]): ThemeMasteryRow[] {
+  const map = new Map(rows.map((r) => [r.tag, r]));
+  return DP1_THEME_ORDER.map((theme) => map.get(theme)).filter((r): r is ThemeMasteryRow => Boolean(r));
+}
 
 const CHOICES: ChoiceOption[] = ["A", "B", "C", "D", "BLANK"];
 
@@ -78,6 +89,24 @@ export default function PaperAttemptPage() {
   >([]);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [themeQuestionCounts, setThemeQuestionCounts] = useState<PaperThemeCountRow[]>([]);
+  const displayedThemeQuestionCounts = useMemo(
+    () =>
+      paper?.dp1AtoCOnly
+        ? themeQuestionCounts.filter((r) => DP1_THEME_ORDER.includes(r.theme as (typeof DP1_THEME_ORDER)[number]))
+        : themeQuestionCounts,
+    [paper?.dp1AtoCOnly, themeQuestionCounts],
+  );
+  const displayedStudentMasteryRows = useMemo(
+    () => (paper?.dp1AtoCOnly ? toDp1OrderedRows(result?.correctTagMastery ?? []) : (result?.correctTagMastery ?? [])),
+    [paper?.dp1AtoCOnly, result?.correctTagMastery],
+  );
+  const displayedClassMasteryRows = useMemo(
+    () =>
+      paper?.dp1AtoCOnly
+        ? toDp1OrderedRows(result?.classComparison?.classTagMastery ?? [])
+        : (result?.classComparison?.classTagMastery ?? []),
+    [paper?.dp1AtoCOnly, result?.classComparison?.classTagMastery],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -229,6 +258,12 @@ export default function PaperAttemptPage() {
           <p className="text-sm font-bold text-[var(--duo-text-muted)]">
             {paper.title} · {(alreadySubmitted ? submittedAnsweredCount : answeredCount)}/{questions.length} answered
           </p>
+          {paper.dp1AtoCOnly && (
+            <div className="mt-2 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
+              <p className="text-xs font-black uppercase tracking-widest">DP1 EOY Exam Prep Only</p>
+              <p className="text-xs font-bold text-white/95">Score and mastery are calculated from Themes A-C only.</p>
+            </div>
+          )}
         </header>
       )}
       {error && (
@@ -339,8 +374,8 @@ export default function PaperAttemptPage() {
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <PaperThemeBreakdownTable
-              themeQuestionCounts={themeQuestionCounts}
-              masteryRows={result.correctTagMastery}
+              themeQuestionCounts={displayedThemeQuestionCounts}
+              masteryRows={displayedStudentMasteryRows}
               title="This paper — questions & your results by theme"
               description="How many questions each theme has on this paper, and how many you answered correctly."
               correctColumnLabel="You (correct / on paper)"
@@ -349,8 +384,13 @@ export default function PaperAttemptPage() {
           </div>
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Theme mastery (correct rate)</h2>
+            {paper?.dp1AtoCOnly && (
+              <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                DP1 only · Themes A-C
+              </span>
+            )}
             <TagStatsChart
-              rows={result.correctTagMastery}
+              rows={displayedStudentMasteryRows}
               emptyMessage="No answers yet."
               ariaLabel="Bar chart of mastery rate per syllabus theme"
             />
@@ -359,8 +399,13 @@ export default function PaperAttemptPage() {
             <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
               <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (this paper)</h2>
               <p className="mb-3 text-xs font-bold text-[#5c6b7a]">Class aggregate for latest submissions on this paper.</p>
+              {paper?.dp1AtoCOnly && (
+                <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                  DP1 only · Themes A-C
+                </span>
+              )}
               <TagStatsChart
-                rows={result.classComparison?.classTagMastery ?? []}
+                rows={displayedClassMasteryRows}
                 emptyMessage="Class comparison will appear when submissions are available."
                 ariaLabel="Class theme mastery on this paper"
               />
@@ -368,8 +413,13 @@ export default function PaperAttemptPage() {
             <div className="rounded-2xl border-2 border-[#d8c9ff] bg-gradient-to-br from-[#f7f3ff] via-white to-[#fdf8ff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
               <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Your mastery (this paper)</h2>
               <p className="mb-3 text-xs font-bold text-[#5f4f8f]">Your correct-rate profile by theme on this paper.</p>
+              {paper?.dp1AtoCOnly && (
+                <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+                  DP1 only · Themes A-C
+                </span>
+              )}
               <TagStatsChart
-                rows={result.correctTagMastery}
+                rows={displayedStudentMasteryRows}
                 emptyMessage="No answers yet."
                 ariaLabel="Your theme mastery on this paper"
               />

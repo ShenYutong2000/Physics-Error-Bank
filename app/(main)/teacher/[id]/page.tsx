@@ -75,6 +75,17 @@ type AnalyticsResponse = {
     correctTagMastery: TagMasteryRow[];
   }>;
 };
+type ThemeMasteryRow = { tag: string; correct: number; total: number; masteryPercent: number };
+const DP1_THEME_ORDER = [
+  "Theme A - Space, Time, and Motion",
+  "Theme B - The Particulate Nature of Matter",
+  "Theme C - Wave Behavior",
+] as const;
+
+function toDp1OrderedRows(rows: ThemeMasteryRow[]): ThemeMasteryRow[] {
+  const map = new Map(rows.map((r) => [r.tag, r]));
+  return DP1_THEME_ORDER.map((theme) => map.get(theme)).filter((r): r is ThemeMasteryRow => Boolean(r));
+}
 
 export default function TeacherPaperDetailPage() {
   const router = useRouter();
@@ -218,10 +229,15 @@ export default function TeacherPaperDetailPage() {
     return filtered;
   }, [analytics?.students, studentSearch, studentListSort]);
 
-  const classMasteryByTag = useMemo(
-    () => masteryMap(sortMasteryRows(analytics?.overall.correctTagMastery ?? [])),
-    [analytics?.overall.correctTagMastery, sortMasteryRows],
-  );
+  const displayedThemeQuestionCounts = analytics?.paper.dp1AtoCOnly
+    ? (analytics.themeQuestionCounts ?? []).filter((r) =>
+        DP1_THEME_ORDER.includes(r.theme as (typeof DP1_THEME_ORDER)[number]),
+      )
+    : (analytics?.themeQuestionCounts ?? []);
+  const displayedOverallMasteryRows = analytics?.paper.dp1AtoCOnly
+    ? toDp1OrderedRows(analytics?.overall.correctTagMastery ?? [])
+    : sortMasteryRows(analytics?.overall.correctTagMastery ?? []);
+  const classMasteryByTag = masteryMap(displayedOverallMasteryRows);
 
   async function saveQuestions() {
     setSavingQuestions(true);
@@ -323,9 +339,10 @@ export default function TeacherPaperDetailPage() {
         </h1>
         {analytics && <p className="text-sm font-bold text-[var(--duo-text-muted)]">{analytics.paper.title}</p>}
         {analytics?.paper.dp1AtoCOnly && (
-          <p className="mt-1 text-xs font-extrabold text-[#7d4cc9]">
-            DP1 EOY Exam Prep enabled: only Themes A-C count in score/mastery analytics.
-          </p>
+          <div className="mt-2 rounded-xl border-2 border-[#7d4cc9] bg-gradient-to-r from-[#7d4cc9] via-[#8d5cf6] to-[#6f42c1] px-3 py-2 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.12)]">
+            <p className="text-xs font-black uppercase tracking-widest">DP1 EOY Exam Prep Only</p>
+            <p className="text-xs font-bold text-white/95">Teacher analytics here include Themes A-C only.</p>
+          </div>
         )}
       </header>
       {error && (
@@ -449,11 +466,11 @@ export default function TeacherPaperDetailPage() {
           Unpublish, edit, then Publish again.
         </p>
       </section>
-      {analytics && analytics.themeQuestionCounts.length > 0 && (
+      {analytics && displayedThemeQuestionCounts.length > 0 && (
         <section className="mb-4 rounded-2xl border-2 border-[#c9d6ff] bg-gradient-to-br from-[#f5f7ff] via-white to-[#f8fbff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <PaperThemeBreakdownTable
-            themeQuestionCounts={analytics.themeQuestionCounts}
-            masteryRows={analytics.overall.correctTagMastery}
+            themeQuestionCounts={displayedThemeQuestionCounts}
+            masteryRows={displayedOverallMasteryRows}
             title="This paper — questions & class results by theme"
             description="Questions per theme on this paper, and class-wide correct answers (all student attempts included in totals)."
             correctColumnLabel="Class (correct / total)"
@@ -476,9 +493,14 @@ export default function TeacherPaperDetailPage() {
             </select>
           </div>
         </div>
+        {analytics?.paper.dp1AtoCOnly && (
+          <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">
+            DP1 only · Themes A-C
+          </span>
+        )}
         {analytics && <p className="mb-2 text-xs font-bold text-[var(--duo-text-muted)]">{analytics.overall.studentCount} students</p>}
         <TagStatsChart
-          rows={sortMasteryRows(analytics?.overall.correctTagMastery ?? [])}
+          rows={displayedOverallMasteryRows}
           emptyMessage="No answers yet."
           ariaLabel="Bar chart of mastery rate per syllabus theme"
         />
@@ -541,11 +563,11 @@ export default function TeacherPaperDetailPage() {
                 )}
               </div>
               <p className="text-xs font-bold text-[var(--duo-text-muted)]">{s.email}</p>
-              {analytics.themeQuestionCounts.length > 0 && (
+              {displayedThemeQuestionCounts.length > 0 && (
                 <div className="mt-2">
                   <PaperThemeBreakdownTable
-                    themeQuestionCounts={analytics.themeQuestionCounts}
-                    masteryRows={s.correctTagMastery}
+                    themeQuestionCounts={displayedThemeQuestionCounts}
+                    masteryRows={analytics.paper.dp1AtoCOnly ? toDp1OrderedRows(s.correctTagMastery) : s.correctTagMastery}
                     title="By theme (this paper)"
                     correctColumnLabel="Correct / on paper"
                     scoreMode="perPaper"
@@ -554,7 +576,7 @@ export default function TeacherPaperDetailPage() {
               )}
               <div className="mt-2">
                 <StudentVsClassMastery
-                  studentRows={sortMasteryRows(s.correctTagMastery)}
+                  studentRows={analytics.paper.dp1AtoCOnly ? toDp1OrderedRows(s.correctTagMastery) : sortMasteryRows(s.correctTagMastery)}
                   classMasteryByTag={classMasteryByTag}
                 />
               </div>
