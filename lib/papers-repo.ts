@@ -658,9 +658,12 @@ export async function getPaperClassComparisonStats(paperId: string): Promise<{
 }
 
 /** All published papers: per-question correct rate across students (latest attempt per student per paper). */
-export async function getPublishedPapersAggregateQuestionStats(): Promise<PublishedPaperStatsRow[]> {
+export async function getPublishedPapersAggregateQuestionStats(onlyDp1Prep = false): Promise<PublishedPaperStatsRow[]> {
   const papers = await prisma.paper.findMany({
-    where: { publishedAt: { not: null } },
+    where: {
+      publishedAt: { not: null },
+      ...(onlyDp1Prep ? { dp1AtoCOnly: true } : {}),
+    },
     orderBy: [{ year: "desc" }, { session: "desc" }],
     include: {
       questions: { select: { number: true }, orderBy: { number: "asc" } },
@@ -733,12 +736,15 @@ export async function getPublishedPapersAggregateQuestionStats(): Promise<Publis
 }
 
 /** Theme mastery across all published papers for one student (one attempt per paper). */
-export async function getCrossPaperThemeMasteryForUser(userId: string): Promise<TagMasteryRow[]> {
+export async function getCrossPaperThemeMasteryForUser(userId: string, onlyDp1Prep = false): Promise<TagMasteryRow[]> {
   const attempts = await prisma.paperAttempt.findMany({
     where: {
       userId,
       isLatest: true,
-      paper: { publishedAt: { not: null } },
+      paper: {
+        publishedAt: { not: null },
+        ...(onlyDp1Prep ? { dp1AtoCOnly: true } : {}),
+      },
     },
     include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });
@@ -751,12 +757,15 @@ export async function getCrossPaperThemeMasteryForUser(userId: string): Promise<
 }
 
 /** Class-wide theme mastery: all student answers on published papers (latest attempts). */
-export async function getCrossPaperThemeMasteryClassWide(): Promise<TagMasteryRow[]> {
+export async function getCrossPaperThemeMasteryClassWide(onlyDp1Prep = false): Promise<TagMasteryRow[]> {
   const attempts = await prisma.paperAttempt.findMany({
     where: {
       isLatest: true,
       user: { role: "STUDENT" },
-      paper: { publishedAt: { not: null } },
+      paper: {
+        publishedAt: { not: null },
+        ...(onlyDp1Prep ? { dp1AtoCOnly: true } : {}),
+      },
     },
     include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });

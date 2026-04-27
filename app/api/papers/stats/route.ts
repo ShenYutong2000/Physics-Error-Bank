@@ -36,29 +36,33 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const studentIdParam = url.searchParams.get("studentId");
+  const prepScope = url.searchParams.get("prep") === "dp1" ? "dp1" : "all";
+  const onlyDp1Prep = prepScope === "dp1";
 
   try {
     if (guard.user.role === "STUDENT") {
       if (studentIdParam && studentIdParam !== guard.user.id) {
         return NextResponse.json({ error: "Forbidden." }, { status: 403 });
       }
-      const cacheKey = `stats:student:self:${guard.user.id}`;
+      const cacheKey = `stats:student:self:${guard.user.id}:prep:${prepScope}`;
       const cached = getCached<{
         papers: Awaited<ReturnType<typeof getPublishedPapersAggregateQuestionStats>>;
         crossPaperThemeMastery: Awaited<ReturnType<typeof getCrossPaperThemeMasteryForUser>>;
         classCrossPaperThemeMastery: Awaited<ReturnType<typeof getCrossPaperThemeMasteryClassWide>>;
         masteryScope: "self";
+        prepScope: "all" | "dp1";
       }>(cacheKey);
       if (cached) return NextResponse.json(cached, { headers: { "x-stats-cache": "hit" } });
 
-      const papers = await getPublishedPapersAggregateQuestionStats();
-      const crossPaperThemeMastery = await getCrossPaperThemeMasteryForUser(guard.user.id);
-      const classCrossPaperThemeMastery = await getCrossPaperThemeMasteryClassWide();
+      const papers = await getPublishedPapersAggregateQuestionStats(onlyDp1Prep);
+      const crossPaperThemeMastery = await getCrossPaperThemeMasteryForUser(guard.user.id, onlyDp1Prep);
+      const classCrossPaperThemeMastery = await getCrossPaperThemeMasteryClassWide(onlyDp1Prep);
       const payload = {
         papers,
         crossPaperThemeMastery,
         classCrossPaperThemeMastery,
         masteryScope: "self" as const,
+        prepScope,
       };
       setCached(cacheKey, payload);
       return NextResponse.json(payload, { headers: { "x-stats-cache": "miss" } });
@@ -66,20 +70,21 @@ export async function GET(request: Request) {
 
     if (guard.user.role === "TEACHER") {
       const cacheKey = studentIdParam
-        ? `stats:teacher:student:${studentIdParam}`
-        : "stats:teacher:class";
+        ? `stats:teacher:student:${studentIdParam}:prep:${prepScope}`
+        : `stats:teacher:class:prep:${prepScope}`;
       const cached = getCached<{
         papers: Awaited<ReturnType<typeof getPublishedPapersAggregateQuestionStats>>;
         crossPaperThemeMastery:
           | Awaited<ReturnType<typeof getCrossPaperThemeMasteryClassWide>>
           | Awaited<ReturnType<typeof getCrossPaperThemeMasteryForUser>>;
         masteryScope: "class" | "student";
+        prepScope: "all" | "dp1";
         selectedStudent?: { userId: string; name: string; email: string };
         students: Awaited<ReturnType<typeof listStudentUsersBrief>>;
       }>(cacheKey);
       if (cached) return NextResponse.json(cached, { headers: { "x-stats-cache": "hit" } });
 
-      const papers = await getPublishedPapersAggregateQuestionStats();
+      const papers = await getPublishedPapersAggregateQuestionStats(onlyDp1Prep);
       const students = await listStudentUsersBrief();
 
       if (studentIdParam) {
@@ -90,11 +95,12 @@ export async function GET(request: Request) {
         if (!target) {
           return NextResponse.json({ error: "Student not found." }, { status: 404 });
         }
-        const crossPaperThemeMastery = await getCrossPaperThemeMasteryForUser(target.id);
+        const crossPaperThemeMastery = await getCrossPaperThemeMasteryForUser(target.id, onlyDp1Prep);
         const payload = {
           papers,
           crossPaperThemeMastery,
           masteryScope: "student" as const,
+          prepScope,
           selectedStudent: {
             userId: target.id,
             name: target.name,
@@ -106,11 +112,12 @@ export async function GET(request: Request) {
         return NextResponse.json(payload, { headers: { "x-stats-cache": "miss" } });
       }
 
-      const crossPaperThemeMastery = await getCrossPaperThemeMasteryClassWide();
+      const crossPaperThemeMastery = await getCrossPaperThemeMasteryClassWide(onlyDp1Prep);
       const payload = {
         papers,
         crossPaperThemeMastery,
         masteryScope: "class" as const,
+        prepScope,
         students,
       };
       setCached(cacheKey, payload);
