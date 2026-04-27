@@ -10,6 +10,7 @@ type CreateBody = {
   year?: unknown;
   session?: unknown;
   questionCount?: unknown;
+  dp1AtoCOnly?: unknown;
 };
 
 export async function GET(request: Request) {
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     typeof body.questionCount === "number"
       ? Math.max(1, Math.min(60, Math.floor(body.questionCount)))
       : DEFAULT_PAPER_QUESTION_COUNT;
+  const dp1AtoCOnly = body.dp1AtoCOnly === true;
   if (!title || !Number.isFinite(year) || !session) {
     return NextResponse.json({ error: "title, year and session are required." }, { status: 400 });
   }
@@ -49,6 +51,7 @@ export async function POST(request: Request) {
       year,
       session,
       questionCount,
+      dp1AtoCOnly,
       createdById: guard.user.id,
     });
     return NextResponse.json({ paper });

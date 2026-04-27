@@ -58,6 +58,7 @@ export default function PaperAttemptPage() {
     correctCount: number;
     wrongCount: number;
     accuracy: number;
+    gradableQuestionCount: number;
     wrongQuestions: WrongQuestion[];
     correctTagMastery: TagMasteryRow[];
     classComparison?: {
@@ -91,6 +92,7 @@ export default function PaperAttemptPage() {
           correctCount: number;
           wrongCount: number;
           accuracy: number;
+          gradableQuestionCount?: number;
           wrongQuestions: WrongQuestion[];
           correctTagMastery: TagMasteryRow[];
           classComparison?: {
@@ -141,6 +143,9 @@ export default function PaperAttemptPage() {
           correctCount: r.data.existingAttempt.correctCount,
           wrongCount: r.data.existingAttempt.wrongCount,
           accuracy: r.data.existingAttempt.accuracy,
+          gradableQuestionCount:
+            r.data.existingAttempt.gradableQuestionCount ??
+            r.data.existingAttempt.correctCount + r.data.existingAttempt.wrongCount,
           wrongQuestions: r.data.existingAttempt.wrongQuestions,
           correctTagMastery: r.data.existingAttempt.correctTagMastery,
           classComparison: r.data.classComparison,
@@ -178,6 +183,7 @@ export default function PaperAttemptPage() {
       correctCount: number;
       wrongCount: number;
       accuracy: number;
+      gradableQuestionCount: number;
       wrongQuestions: WrongQuestion[];
       correctTagMastery: TagMasteryRow[];
       themeQuestionCounts: PaperThemeCountRow[];
@@ -236,6 +242,11 @@ export default function PaperAttemptPage() {
         </p>
       )}
       <section className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+        {paper?.dp1AtoCOnly && (
+          <p className="mb-3 rounded-xl border-2 border-[#d8c9ff] bg-[#f8f3ff] px-3 py-2 text-xs font-extrabold text-[#5f4f8f]">
+            DP1 EOY Exam Prep: this paper keeps 40 questions, but score and mastery only count Themes A-C.
+          </p>
+        )}
         <div className="space-y-2">
           {(alreadySubmitted
             ? submittedAnswers
@@ -315,7 +326,7 @@ export default function PaperAttemptPage() {
 
           <div className="rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
             <p className="text-lg font-extrabold text-[var(--duo-text)]">
-              Score: {result.correctCount}/{result.correctCount + result.wrongCount} ({result.accuracy}%)
+              Score: {result.correctCount}/{result.gradableQuestionCount} ({result.accuracy}%)
             </p>
             <p className="text-sm font-bold text-[var(--duo-text-muted)]">
               Wrong: {result.wrongCount}

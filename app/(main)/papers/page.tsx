@@ -128,6 +128,9 @@ export default function PapersPage() {
             </p>
             <p className="mt-1 text-sm font-bold text-[var(--duo-text-muted)]">{paper.title}</p>
             <p className="mt-2 text-xs font-bold text-[var(--duo-blue)]">{paper.questionCount} questions</p>
+            {paper.dp1AtoCOnly && (
+              <p className="mt-1 text-xs font-extrabold text-[#7d4cc9]">DP1 EOY Exam Prep · Themes A-C counted</p>
+            )}
           </Link>
         ))}
       </div>

@@ -12,6 +12,12 @@ import {
 } from "@/lib/paper-types";
 import { canonicalizePaperThemeLabel, normalizePaperTheme, PAPER_THEME_LABELS } from "@/lib/paper-themes";
 
+const DP1_EOY_INCLUDED_THEME_LABELS = new Set<string>([
+  "Theme A - Space, Time, and Motion",
+  "Theme B - The Particulate Nature of Matter",
+  "Theme C - Wave Behavior",
+]);
+
 type PaperQuestionInput = {
   number: number;
   correctAnswer: ChoiceOption;
@@ -29,6 +35,7 @@ function toPaperSummary(row: {
   year: number;
   session: ExamSession;
   questionCount: number;
+  dp1AtoCOnly: boolean;
   publishedAt: Date | null;
 }): PaperSummary {
   return {
@@ -37,8 +44,15 @@ function toPaperSummary(row: {
     year: row.year,
     session: row.session,
     questionCount: row.questionCount,
+    dp1AtoCOnly: row.dp1AtoCOnly,
     publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
   };
+}
+
+function shouldIncludeThemeForScoring(theme: string, dp1AtoCOnly: boolean): boolean {
+  if (!dp1AtoCOnly) return true;
+  const canonical = canonicalizePaperThemeLabel(theme);
+  return DP1_EOY_INCLUDED_THEME_LABELS.has(canonical);
 }
 
 function sortThemesBySyllabusOrder(rows: PaperThemeCountRow[]): PaperThemeCountRow[] {
@@ -107,6 +121,7 @@ export async function listPapers(input: { includeUnpublished: boolean }): Promis
       year: true,
       session: true,
       questionCount: true,
+      dp1AtoCOnly: true,
       publishedAt: true,
     },
   });
@@ -118,6 +133,7 @@ export async function createPaper(input: {
   year: number;
   session: ExamSession;
   questionCount: number;
+  dp1AtoCOnly?: boolean;
   createdById: string;
 }): Promise<PaperSummary> {
   const row = await prisma.paper.create({
@@ -126,6 +142,7 @@ export async function createPaper(input: {
       year: input.year,
       session: input.session,
       questionCount: input.questionCount,
+      dp1AtoCOnly: input.dp1AtoCOnly ?? false,
       createdById: input.createdById,
     },
     select: {
@@ -134,6 +151,7 @@ export async function createPaper(input: {
       year: true,
       session: true,
       questionCount: true,
+      dp1AtoCOnly: true,
       publishedAt: true,
     },
   });
@@ -198,6 +216,7 @@ export async function publishPaper(paperId: string, publish: boolean): Promise<P
       year: true,
       session: true,
       questionCount: true,
+      dp1AtoCOnly: true,
       publishedAt: true,
     },
   });
@@ -272,11 +291,15 @@ export async function getStudentPaperAttemptSummary(paperId: string, userId: str
   const row = await prisma.paperAttempt.findFirst({
     where: { paperId, userId },
     orderBy: { submittedAt: "desc" },
-    include: { answers: true },
+    include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });
   if (!row) return null;
+  const gradedAnswers = row.answers.filter((a) => shouldIncludeThemeForScoring(a.themeSnapshot, row.paper.dp1AtoCOnly));
+  const correctCount = gradedAnswers.filter((a) => a.isCorrect).length;
+  const wrongCount = gradedAnswers.length - correctCount;
+  const accuracy = gradedAnswers.length > 0 ? Number(((correctCount / gradedAnswers.length) * 100).toFixed(2)) : 0;
   const wrongQuestions = row.answers
-    .filter((a) => !a.isCorrect)
+    .filter((a) => !a.isCorrect && shouldIncludeThemeForScoring(a.themeSnapshot, row.paper.dp1AtoCOnly))
     .sort((a, b) => a.questionNumber - b.questionNumber)
     .map((a) => ({
       questionNumber: a.questionNumber,
@@ -296,12 +319,13 @@ export async function getStudentPaperAttemptSummary(paperId: string, userId: str
   return {
     attemptId: row.id,
     submittedAt: row.submittedAt.toISOString(),
-    correctCount: row.correctCount,
-    wrongCount: row.wrongCount,
-    accuracy: Number(row.accuracy),
+    correctCount,
+    wrongCount,
+    accuracy,
+    gradableQuestionCount: gradedAnswers.length,
     wrongQuestions,
     correctTagMastery: toThemeMasteryRows(
-      row.answers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
+      gradedAnswers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
     ),
     themeQuestionCounts,
     submittedAnswers,
@@ -324,12 +348,15 @@ export async function submitPaperAttempt(input: {
     correctAnswer: ChoiceOption;
     theme: string;
   }>;
+  gradableQuestionCount: number;
   correctTagMastery: TagMasteryRow[];
   themeQuestionCounts: PaperThemeCountRow[];
 }> {
   const paper = await prisma.paper.findUnique({
     where: { id: input.paperId },
-    include: {
+    select: {
+      publishedAt: true,
+      dp1AtoCOnly: true,
       questions: {
         orderBy: { number: "asc" },
         select: { number: true, correctAnswer: true, theme: true },
@@ -361,8 +388,9 @@ export async function submitPaperAttempt(input: {
       theme: q.theme,
     };
   });
-  const correctCount = judged.filter((j) => j.isCorrect).length;
-  const wrongQuestions = judged
+  const gradable = judged.filter((j) => shouldIncludeThemeForScoring(j.theme, paper.dp1AtoCOnly));
+  const correctCount = gradable.filter((j) => j.isCorrect).length;
+  const wrongQuestions = gradable
     .filter((j) => !j.isCorrect)
     .map(({ questionNumber, studentAnswer, correctAnswer, theme }) => ({
       questionNumber,
@@ -371,8 +399,8 @@ export async function submitPaperAttempt(input: {
       theme,
     }));
   const wrongCount = wrongQuestions.length;
-  const accuracy = paper.questions.length > 0 ? Number(((correctCount / paper.questions.length) * 100).toFixed(2)) : 0;
-  const correctTagMastery = toThemeMasteryRows(judged.map((j) => ({ theme: j.theme, isCorrect: j.isCorrect })));
+  const accuracy = gradable.length > 0 ? Number(((correctCount / gradable.length) * 100).toFixed(2)) : 0;
+  const correctTagMastery = toThemeMasteryRows(gradable.map((j) => ({ theme: j.theme, isCorrect: j.isCorrect })));
   const themeQuestionCounts = buildPaperThemeQuestionCounts(paper.questions);
 
   const result = await prisma.$transaction(async (tx) => {
@@ -412,6 +440,7 @@ export async function submitPaperAttempt(input: {
     wrongCount,
     accuracy,
     wrongQuestions,
+    gradableQuestionCount: gradable.length,
     correctTagMastery,
     themeQuestionCounts,
   };
@@ -420,12 +449,16 @@ export async function submitPaperAttempt(input: {
 export async function getAttemptDetail(attemptId: string, userId: string) {
   const row = await prisma.paperAttempt.findFirst({
     where: { id: attemptId, userId },
-    include: { answers: true },
+    include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });
   if (!row) return null;
+  const gradedAnswers = row.answers.filter((a) => shouldIncludeThemeForScoring(a.themeSnapshot, row.paper.dp1AtoCOnly));
+  const correctCount = gradedAnswers.filter((a) => a.isCorrect).length;
+  const wrongCount = gradedAnswers.length - correctCount;
+  const accuracy = gradedAnswers.length > 0 ? Number(((correctCount / gradedAnswers.length) * 100).toFixed(2)) : 0;
   const themeQuestionCounts = await getPaperThemeQuestionCounts(row.paperId);
   const wrongQuestions = row.answers
-    .filter((a) => !a.isCorrect)
+    .filter((a) => !a.isCorrect && shouldIncludeThemeForScoring(a.themeSnapshot, row.paper.dp1AtoCOnly))
     .sort((a, b) => a.questionNumber - b.questionNumber)
     .map((a) => ({
       questionNumber: a.questionNumber,
@@ -438,13 +471,14 @@ export async function getAttemptDetail(attemptId: string, userId: string) {
       id: row.id,
       paperId: row.paperId,
       submittedAt: row.submittedAt.toISOString(),
-      correctCount: row.correctCount,
-      wrongCount: row.wrongCount,
-      accuracy: Number(row.accuracy),
+      correctCount,
+      wrongCount,
+      accuracy,
+      gradableQuestionCount: gradedAnswers.length,
     },
     wrongQuestions,
     correctTagMastery: toThemeMasteryRows(
-      row.answers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
+      gradedAnswers.map((a) => ({ theme: a.themeSnapshot, isCorrect: a.isCorrect })),
     ),
     themeQuestionCounts,
   };
@@ -459,6 +493,7 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
       year: true,
       session: true,
       questionCount: true,
+      dp1AtoCOnly: true,
       publishedAt: true,
       questions: { select: { theme: true } },
     },
@@ -478,7 +513,11 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
     orderBy: { submittedAt: "desc" },
   });
   const overall = toThemeMasteryRows(
-    attempts.flatMap((a) => a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect }))),
+    attempts.flatMap((a) =>
+      a.answers
+        .filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, paper.dp1AtoCOnly))
+        .map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+    ),
   );
   const byStudent = new Map<
     string,
@@ -503,13 +542,24 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
         attemptCount: 1,
         latestAttemptId: attempt.id,
         latestSubmittedAt: attempt.submittedAt.toISOString(),
-        latestAccuracy: Number(attempt.accuracy),
-        answers: attempt.answers.map((a) => ({ themeSnapshot: a.themeSnapshot, isCorrect: a.isCorrect })),
+        latestAccuracy: (() => {
+          const graded = attempt.answers.filter((a) => shouldIncludeThemeForScoring(a.themeSnapshot, paper.dp1AtoCOnly));
+          if (graded.length === 0) return 0;
+          const correct = graded.filter((a) => a.isCorrect).length;
+          return Number(((correct / graded.length) * 100).toFixed(2));
+        })(),
+        answers: attempt.answers
+          .filter((a) => shouldIncludeThemeForScoring(a.themeSnapshot, paper.dp1AtoCOnly))
+          .map((a) => ({ themeSnapshot: a.themeSnapshot, isCorrect: a.isCorrect })),
       });
       return;
     }
     existing.attemptCount += 1;
-    existing.answers.push(...attempt.answers.map((a) => ({ themeSnapshot: a.themeSnapshot, isCorrect: a.isCorrect })));
+    existing.answers.push(
+      ...attempt.answers
+        .filter((a) => shouldIncludeThemeForScoring(a.themeSnapshot, paper.dp1AtoCOnly))
+        .map((a) => ({ themeSnapshot: a.themeSnapshot, isCorrect: a.isCorrect })),
+    );
   });
   const students = Array.from(byStudent.values())
     .map((s) => ({
@@ -526,7 +576,16 @@ export async function getTeacherPaperAnalytics(paperId: string, mode: "latest" |
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "en"));
   const averageAccuracy = attempts.length
-    ? Number((attempts.reduce((sum, a) => sum + Number(a.accuracy), 0) / attempts.length).toFixed(2))
+    ? Number(
+        (
+          attempts.reduce((sum, a) => {
+            const graded = a.answers.filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, paper.dp1AtoCOnly));
+            if (graded.length === 0) return sum;
+            const correct = graded.filter((ans) => ans.isCorrect).length;
+            return sum + (correct / graded.length) * 100;
+          }, 0) / attempts.length
+        ).toFixed(2),
+      )
     : 0;
   return {
     paper: toPaperSummary(paper),
@@ -549,6 +608,13 @@ export async function getPaperClassComparisonStats(paperId: string): Promise<{
   averageAccuracy: number;
   classTagMastery: TagMasteryRow[];
 }> {
+  const paper = await prisma.paper.findUnique({
+    where: { id: paperId },
+    select: { dp1AtoCOnly: true },
+  });
+  if (!paper) {
+    return { studentCount: 0, attemptCount: 0, averageAccuracy: 0, classTagMastery: [] };
+  }
   const attempts = await prisma.paperAttempt.findMany({
     where: {
       paperId,
@@ -565,10 +631,23 @@ export async function getPaperClassComparisonStats(paperId: string): Promise<{
   const attemptCount = attempts.length;
   const averageAccuracy =
     attemptCount > 0
-      ? Number((attempts.reduce((sum, a) => sum + Number(a.accuracy), 0) / attemptCount).toFixed(2))
+      ? Number(
+          (
+            attempts.reduce((sum, a) => {
+              const graded = a.answers.filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, paper.dp1AtoCOnly));
+              if (graded.length === 0) return sum;
+              const correct = graded.filter((ans) => ans.isCorrect).length;
+              return sum + (correct / graded.length) * 100;
+            }, 0) / attemptCount
+          ).toFixed(2),
+        )
       : 0;
   const classTagMastery = toThemeMasteryRows(
-    attempts.flatMap((a) => a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect }))),
+    attempts.flatMap((a) =>
+      a.answers
+        .filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, paper.dp1AtoCOnly))
+        .map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+    ),
   );
   return {
     studentCount: studentIds.size,
@@ -598,10 +677,9 @@ export async function getPublishedPapersAggregateQuestionStats(): Promise<Publis
     },
     select: {
       paperId: true,
-      accuracy: true,
+      paper: { select: { dp1AtoCOnly: true } },
       answers: {
-        where: { isCorrect: true },
-        select: { questionNumber: true },
+        select: { questionNumber: true, isCorrect: true, themeSnapshot: true },
       },
     },
   });
@@ -614,8 +692,12 @@ export async function getPublishedPapersAggregateQuestionStats(): Promise<Publis
       byPaper.set(att.paperId, agg);
     }
     agg.attemptCount += 1;
-    agg.accuracySum += Number(att.accuracy);
-    for (const ans of att.answers) {
+    const gradedAnswers = att.answers.filter((ans) =>
+      shouldIncludeThemeForScoring(ans.themeSnapshot, att.paper.dp1AtoCOnly),
+    );
+    const correctInAttempt = gradedAnswers.filter((ans) => ans.isCorrect).length;
+    agg.accuracySum += gradedAnswers.length > 0 ? (correctInAttempt / gradedAnswers.length) * 100 : 0;
+    for (const ans of gradedAnswers.filter((a) => a.isCorrect)) {
       agg.correctByQuestion.set(ans.questionNumber, (agg.correctByQuestion.get(ans.questionNumber) ?? 0) + 1);
     }
   }
@@ -658,10 +740,12 @@ export async function getCrossPaperThemeMasteryForUser(userId: string): Promise<
       isLatest: true,
       paper: { publishedAt: { not: null } },
     },
-    include: { answers: true },
+    include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });
   const items = attempts.flatMap((a) =>
-    a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+    a.answers
+      .filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, a.paper.dp1AtoCOnly))
+      .map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
   );
   return toThemeMasteryRows(items);
 }
@@ -674,10 +758,12 @@ export async function getCrossPaperThemeMasteryClassWide(): Promise<TagMasteryRo
       user: { role: "STUDENT" },
       paper: { publishedAt: { not: null } },
     },
-    include: { answers: true },
+    include: { answers: true, paper: { select: { dp1AtoCOnly: true } } },
   });
   const items = attempts.flatMap((a) =>
-    a.answers.map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
+    a.answers
+      .filter((ans) => shouldIncludeThemeForScoring(ans.themeSnapshot, a.paper.dp1AtoCOnly))
+      .map((ans) => ({ theme: ans.themeSnapshot, isCorrect: ans.isCorrect })),
   );
   return toThemeMasteryRows(items);
 }

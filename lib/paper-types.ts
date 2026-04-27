@@ -15,6 +15,7 @@ export type PaperSummary = {
   year: number;
   session: ExamSession;
   questionCount: number;
+  dp1AtoCOnly: boolean;
   publishedAt: string | null;
 };
 
