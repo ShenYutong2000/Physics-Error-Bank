@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { PaperBankPageHeader } from "@/components/paper-bank-page-header";
 import { mainPageClassName } from "@/components/main-page-layout";
 import { PaperModeToggle } from "@/components/paper-mode-toggle";
 import { DEFAULT_PAPER_QUESTION_COUNT, type ExamSession, type PaperSummary } from "@/lib/paper-types";
@@ -145,36 +146,27 @@ export default function TeacherHomePage() {
 
   return (
     <div className={mainPageClassName}>
-      <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[var(--duo-blue)]">Teacher</p>
-          <h1 className="text-2xl font-extrabold text-[var(--duo-text)]">Shared paper bank</h1>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Link
-              href="/teacher/papers-overview"
-              className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
-            >
-              All papers — stats & theme mastery →
-            </Link>
-            <Link
-              href="/teacher/mistakes"
-              className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--duo-border)] bg-[var(--duo-surface)] px-3 py-2 text-sm font-extrabold text-[var(--duo-green-dark)] shadow-[0_3px_0_0_rgba(0,0,0,0.06)] active:translate-y-0.5 active:shadow-none"
-            >
-              Class mistake analytics →
-            </Link>
-          </div>
-        </div>
-        <PaperModeToggle
-          value={prepScope}
-          onChange={setPrepScope}
-          className="lg:ml-auto"
-          summaryText={
-            prepScope === "dp1"
-              ? "Showing only DP1 EOY Exam Prep papers. Useful for quick DP1 planning."
-              : "Showing all draft and published papers."
-          }
-        />
-      </header>
+      <PaperBankPageHeader
+        eyebrow="Teacher"
+        title="Shared paper bank"
+        className="mb-5"
+        links={[
+          { href: "/teacher/papers-overview", label: "All papers — stats & theme mastery →" },
+          { href: "/teacher/mistakes", label: "Class mistake analytics →" },
+        ]}
+        right={
+          <PaperModeToggle
+            value={prepScope}
+            onChange={setPrepScope}
+            className="w-full max-w-[28rem] shrink-0 lg:ml-auto"
+            summaryText={
+              prepScope === "dp1"
+                ? "Showing only DP1 EOY Exam Prep papers. Useful for quick DP1 planning."
+                : "Showing all draft and published papers."
+            }
+          />
+        }
+      />
       {error && (
         <p className="mb-3 rounded-xl border-2 border-[#ff4b4b] bg-[#ffe8e8] px-3 py-2 text-sm font-bold text-[#c00]">
           {error}
