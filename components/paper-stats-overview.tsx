@@ -299,11 +299,12 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div>
         <PaperModeToggle
           value={prepScope}
           onChange={setPrepScope}
           disabled={loading}
+          className="w-full max-w-none"
           summaryText={
             prepScope === "dp1"
               ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep; mastery and scores use Themes A-C only."
