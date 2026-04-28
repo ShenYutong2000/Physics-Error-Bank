@@ -40,7 +40,7 @@ export function PaperModeToggle({ value, onChange, disabled, summaryText, classN
         aria-label="Paper scope"
       >
         <div
-          className="relative flex flex-row items-stretch gap-1.5 overflow-hidden rounded-[14px] border border-[var(--duo-border)]/45 bg-gradient-to-b from-slate-100/80 to-slate-100/50 p-1.5 shadow-[0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-sm"
+          className="relative flex flex-row items-stretch gap-1.5 overflow-hidden rounded-[14px] border border-[var(--duo-border)]/45 bg-gradient-to-b from-slate-100/80 to-slate-100/50 p-1.5 shadow-[0_1px_0_rgba(255,255,255,0.5)]"
         >
           {/* Sliding “thumb” – animates with spring-like easing; color tracks selection */}
           <div
