@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetchJson } from "@/lib/api-client";
+import { PaperBankPageHeader } from "@/components/paper-bank-page-header";
 import { TagStatsChart } from "@/components/tag-stats-chart";
 import { PaperModeToggle } from "@/components/paper-mode-toggle";
 import type { PublishedPaperStatsRow, TagMasteryRow } from "@/lib/paper-types";
@@ -297,21 +298,46 @@ export function PaperStatsOverviewPanel({ variant }: { variant: "student" | "tea
   const effectiveStudentVisibleCount = Math.min(studentVisibleCount, displayedStudentPapers.length);
   const effectiveTeacherVisibleCount = Math.min(teacherVisibleCount, teacherPapers.length);
 
+  const paperModeSummary =
+    prepScope === "dp1"
+      ? variant === "teacher"
+        ? "Showing only DP1 EOY Exam Prep papers. Useful for quick DP1 planning."
+        : "Showing only DP1 EOY Exam Prep papers. Mastery and scores use Themes A-C only."
+      : variant === "teacher"
+        ? "Showing all draft and published papers."
+        : "Showing all published papers.";
+
   return (
     <div className="space-y-6">
-      <div>
-        <PaperModeToggle
-          value={prepScope}
-          onChange={setPrepScope}
-          disabled={loading}
-          className="w-full max-w-none"
-          summaryText={
-            prepScope === "dp1"
-              ? "DP1 mode only includes papers marked as DP1 EOY Exam Prep; mastery and scores use Themes A-C only."
-              : "All mode includes every published paper."
-          }
-        />
-      </div>
+      <PaperBankPageHeader
+        eyebrow={variant === "teacher" ? "Teacher" : "Past papers"}
+        title={variant === "teacher" ? "Shared paper bank" : "All papers — stats & mastery"}
+        description={
+          variant === "teacher"
+            ? "Published-paper question statistics for the whole class, and theme mastery for the class or a selected student."
+            : "Class-wide correct rate per question on every published paper, and your theme mastery across all papers you completed."
+        }
+        links={
+          variant === "teacher"
+            ? [
+                { href: "/teacher", label: "Shared paper bank →" },
+                { href: "/teacher/mistakes", label: "Class mistake analytics →" },
+              ]
+            : [
+                { href: "/papers", label: "Choose a paper →" },
+                { href: "/library", label: "Mistake library →" },
+              ]
+        }
+        right={
+          <PaperModeToggle
+            value={prepScope}
+            onChange={setPrepScope}
+            disabled={loading}
+            className="w-full max-w-[28rem] shrink-0 lg:ml-auto"
+            summaryText={paperModeSummary}
+          />
+        }
+      />
       {variant === "teacher" && (
         <div className="rounded-2xl border-2 border-[#cfe6ff] bg-gradient-to-br from-[#f8fbff] via-white to-[#f3fffb] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <label className="mb-2 block text-sm font-extrabold text-[var(--duo-text)]" htmlFor="paper-stats-student">
