@@ -14,10 +14,11 @@ type PaperModeToggleProps = {
 
 const easeSegment = "cubic-bezier(0.32, 0.72, 0, 1)";
 
+/** Match page bg so the ring does not look like a second “box” */
 const focusAll =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5d6bff]/40 focus-visible:ring-offset-2";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5d6bff]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]";
 const focusDp1 =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/45 focus-visible:ring-offset-2";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]";
 
 export function PaperModeToggle({ value, onChange, disabled, summaryText, className }: PaperModeToggleProps) {
   const slideStyle: CSSProperties = {
@@ -27,19 +28,19 @@ export function PaperModeToggle({ value, onChange, disabled, summaryText, classN
 
   return (
     <div
-      className={`w-full max-w-[28rem] rounded-[18px] border border-slate-200/95 bg-white p-5 shadow-[0_8px_30px_-10px_rgba(15,23,42,0.12),0_2px_8px_-4px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/[0.04] ${className ?? ""}`}
+      className={`w-full max-w-[28rem] flex flex-col gap-3 p-0 ${className ?? ""}`}
     >
-      <p className="text-center text-[11px] font-extrabold uppercase tracking-[0.22em] text-slate-400">
+      <p className="text-center text-[11px] font-extrabold uppercase tracking-[0.22em] text-[var(--duo-text-muted)]/80">
         Paper mode
       </p>
 
       <div
-        className="mt-4 shadow-[inset_0_1px_3px_rgba(15,23,42,0.09),inset_0_-1px_0_rgba(255,255,255,0.7)] ring-1 ring-inset ring-white/50 sm:mt-5"
+        className="shadow-[inset_0_1px_2px_rgba(15,23,42,0.06),inset_0_-1px_0_rgba(255,255,255,0.4)]"
         role="group"
         aria-label="Paper scope"
       >
         <div
-          className="relative flex flex-row items-stretch gap-1.5 overflow-hidden rounded-[14px] bg-gradient-to-b from-slate-100 to-slate-100/90 p-1.5"
+          className="relative flex flex-row items-stretch gap-1.5 overflow-hidden rounded-[14px] border border-[var(--duo-border)]/45 bg-gradient-to-b from-slate-100/80 to-slate-100/50 p-1.5 shadow-[0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-sm"
         >
           {/* Sliding “thumb” – animates with spring-like easing; color tracks selection */}
           <div
@@ -77,7 +78,7 @@ export function PaperModeToggle({ value, onChange, disabled, summaryText, classN
         </div>
       </div>
 
-      <p className="mt-4 text-center text-[13px] font-medium leading-relaxed text-slate-500">
+      <p className="text-center text-[13px] font-medium leading-relaxed text-[var(--duo-text-muted)]/90">
         {summaryText ??
           (value === "dp1" ? "Showing only DP1 EOY Exam Prep papers." : "Showing all draft and published papers.")}
       </p>
