@@ -12,6 +12,14 @@ export function normalizeYearFilter(raw: string, availableYears: number[]): stri
   return raw === "all" || availableYears.includes(Number(raw)) ? raw : "all";
 }
 
+export function shouldAutoResetYearFilter(raw: string, effective: string): boolean {
+  return raw !== effective;
+}
+
+export function getYearResetNotice(): string {
+  return "Year filter was invalid and has been reset to All years.";
+}
+
 export function toDp1OrderedRows(rows: TagMasteryRow[]): TagMasteryRow[] {
   const map = new Map(rows.map((r) => [r.tag, r]));
   return DP1_THEME_ORDER.map((theme) => map.get(theme)).filter((r): r is TagMasteryRow => Boolean(r));

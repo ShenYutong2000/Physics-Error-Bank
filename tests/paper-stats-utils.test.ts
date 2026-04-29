@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { PublishedPaperStatsRow } from "../lib/paper-types";
-import { normalizeYearFilter, sortStudentPapers, toDp1OrderedRows } from "../lib/paper-stats-utils";
+import {
+  getYearResetNotice,
+  normalizeYearFilter,
+  shouldAutoResetYearFilter,
+  sortStudentPapers,
+  toDp1OrderedRows,
+} from "../lib/paper-stats-utils";
 
 function makeRow(input: {
   id: string;
@@ -35,6 +41,12 @@ test("normalizeYearFilter falls back to all for invalid year", () => {
   assert.equal(normalizeYearFilter("2022", [2024, 2023]), "all");
   assert.equal(normalizeYearFilter("all", [2024, 2023]), "all");
   assert.equal(normalizeYearFilter("2024", [2024, 2023]), "2024");
+});
+
+test("year reset helpers are deterministic", () => {
+  assert.equal(shouldAutoResetYearFilter("2022", "all"), true);
+  assert.equal(shouldAutoResetYearFilter("all", "all"), false);
+  assert.equal(getYearResetNotice(), "Year filter was invalid and has been reset to All years.");
 });
 
 test("toDp1OrderedRows keeps A/B/C order and filters others", () => {

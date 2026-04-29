@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
 import { replaceUrlWithQuery } from "@/lib/client-url";
-import { normalizeYearFilter, sortStudentPapers, toDp1OrderedRows, type StudentPaperSort } from "@/lib/paper-stats-utils";
+import {
+  getYearResetNotice,
+  normalizeYearFilter,
+  shouldAutoResetYearFilter,
+  sortStudentPapers,
+  toDp1OrderedRows,
+  type StudentPaperSort,
+} from "@/lib/paper-stats-utils";
 import type { PublishedPaperStatsRow, TagMasteryRow } from "@/lib/paper-types";
 
 /**
@@ -40,6 +47,7 @@ export function usePaperStatsData(variant: "student" | "teacher") {
   const [data, setData] = useState<StatsPayload | null>(null);
   const [teacherData, setTeacherData] = useState<TeacherPanelState>({ classData: null, selectedData: null });
   const [error, setError] = useState<string | null>(null);
+  const [filterNotice, setFilterNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [studentId, setStudentId] = useState<string>(() => {
@@ -248,17 +256,31 @@ export function usePaperStatsData(variant: "student" | "teacher") {
     });
   }, [effectiveTeacherYearFilter, prepScope, studentId, variant]);
 
-  const filterNotice = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const rawYear = new URLSearchParams(window.location.search).get("year");
-    if (!rawYear) return null;
-    if (variant === "student") {
-      if (rawYear === "all" || studentAvailableYears.includes(Number(rawYear))) return null;
-      return "Year filter was invalid and has been reset to All years.";
-    }
-    if (rawYear === "all" || teacherAvailableYears.includes(Number(rawYear))) return null;
-    return "Year filter was invalid and has been reset to All years.";
-  }, [studentAvailableYears, teacherAvailableYears, variant]);
+  useEffect(() => {
+    if (variant !== "student") return;
+    if (!shouldAutoResetYearFilter(studentYearFilter, effectiveStudentYearFilter)) return;
+    const syncTimer = window.setTimeout(() => setStudentYearFilter(effectiveStudentYearFilter), 0);
+    const showTimer = window.setTimeout(() => setFilterNotice(getYearResetNotice()), 0);
+    const hideTimer = window.setTimeout(() => setFilterNotice(null), 2200);
+    return () => {
+      window.clearTimeout(syncTimer);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [effectiveStudentYearFilter, studentYearFilter, variant]);
+
+  useEffect(() => {
+    if (variant !== "teacher") return;
+    if (!shouldAutoResetYearFilter(teacherYearFilter, effectiveTeacherYearFilter)) return;
+    const syncTimer = window.setTimeout(() => setTeacherYearFilter(effectiveTeacherYearFilter), 0);
+    const showTimer = window.setTimeout(() => setFilterNotice(getYearResetNotice()), 0);
+    const hideTimer = window.setTimeout(() => setFilterNotice(null), 2200);
+    return () => {
+      window.clearTimeout(syncTimer);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [effectiveTeacherYearFilter, teacherYearFilter, variant]);
 
   const onTeacherStudentChange = (next: string) => {
     setStudentId(next);
