@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { replaceUrlWithQuery } from "@/lib/client-url";
 import { PaperBankPageHeader } from "@/components/paper-bank-page-header";
 import { mainPageClassName } from "@/components/main-page-layout";
 import { PaperModeToggle } from "@/components/paper-mode-toggle";
@@ -62,25 +63,20 @@ export default function PapersPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (effectiveYearFilter === "all") {
-      params.delete("year");
-    } else {
-      params.set("year", effectiveYearFilter);
-    }
-    if (prepScope === "all") {
-      params.delete("prep");
-    } else {
-      params.set("prep", prepScope);
-    }
-    const query = params.toString();
-    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
-    window.history.replaceState(null, "", path);
+    replaceUrlWithQuery({
+      year: effectiveYearFilter === "all" ? null : effectiveYearFilter,
+      prep: prepScope === "all" ? null : prepScope,
+    });
   }, [effectiveYearFilter, prepScope]);
 
   return (
-    <div className={mainPageClassName}>
+    <div
+      className={`${mainPageClassName} transition-colors duration-300 ${
+        prepScope === "dp1"
+          ? "rounded-3xl border border-[#e2d5ff] bg-gradient-to-br from-[#fdfbff] via-[#faf6ff] to-[#f5f7ff]"
+          : ""
+      }`}
+    >
       <PaperBankPageHeader
         eyebrow="Past papers"
         title="Choose a paper"
@@ -99,22 +95,24 @@ export default function PapersPage() {
         }
       />
       <div className="mb-6 mt-3 max-w-xs">
-          <label htmlFor="student-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
-            Filter by year
-          </label>
-          <select
-            id="student-paper-year-filter"
-            value={effectiveYearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
-          >
-            <option value="all">All years</option>
-            {availableYears.map((y) => (
-              <option key={y} value={String(y)}>
-                {y}
-              </option>
-            ))}
-          </select>
+        <label htmlFor="student-paper-year-filter" className="mb-1 block text-xs font-extrabold text-[var(--duo-text)]">
+          Filter by year
+        </label>
+        <select
+          id="student-paper-year-filter"
+          value={effectiveYearFilter}
+          onChange={(e) => setYearFilter(e.target.value)}
+          className={`w-full rounded-xl border-2 px-3 py-2 text-sm font-bold ${
+            prepScope === "dp1" ? "border-[#d7c1ff] bg-[#fcf8ff]" : "border-[var(--duo-border)] bg-white"
+          }`}
+        >
+          <option value="all">All years</option>
+          {availableYears.map((y) => (
+            <option key={y} value={String(y)}>
+              {y}
+            </option>
+          ))}
+        </select>
       </div>
       {loading && <p className="text-sm font-bold text-[var(--duo-text-muted)]">Loading papers...</p>}
       {error && (
@@ -127,7 +125,11 @@ export default function PapersPage() {
           <Link
             key={paper.id}
             href={`/papers/${paper.id}`}
-            className="block rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+            className={`block rounded-2xl border-2 p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)] transition-colors ${
+              prepScope === "dp1"
+                ? "border-[#d9c6ff] bg-gradient-to-br from-white via-[#fdfaff] to-[#f8f2ff]"
+                : "border-[var(--duo-border)] bg-white"
+            }`}
           >
             <p className="text-lg font-extrabold text-[var(--duo-text)]">
               {paper.year} {paper.session}

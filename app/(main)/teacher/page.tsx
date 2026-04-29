@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { replaceUrlWithQuery } from "@/lib/client-url";
 import { PaperBankPageHeader } from "@/components/paper-bank-page-header";
 import { mainPageClassName } from "@/components/main-page-layout";
 import { PaperModeToggle } from "@/components/paper-mode-toggle";
@@ -47,9 +48,10 @@ export default function TeacherHomePage() {
     [effectiveYearFilter, scopedPapers],
   );
 
-  async function loadPapers() {
-    const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
+  async function loadPapers(signal?: AbortSignal) {
+    const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers", { signal });
     if (!r.ok) {
+      if (r.error === "Request cancelled.") return;
       setError(r.error);
       return;
     }
@@ -57,37 +59,20 @@ export default function TeacherHomePage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
-      const r = await apiFetchJson<{ papers: PaperSummary[] }>("/api/teacher/papers");
-      if (cancelled) return;
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      setPapers(r.data.papers ?? []);
+      await loadPapers(controller.signal);
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (effectiveYearFilter === "all") {
-      params.delete("year");
-    } else {
-      params.set("year", effectiveYearFilter);
-    }
-    if (prepScope === "all") {
-      params.delete("prep");
-    } else {
-      params.set("prep", prepScope);
-    }
-    const query = params.toString();
-    const path = `${window.location.pathname}${query ? `?${query}` : ""}`;
-    window.history.replaceState(null, "", path);
+    replaceUrlWithQuery({
+      year: effectiveYearFilter === "all" ? null : effectiveYearFilter,
+      prep: prepScope === "all" ? null : prepScope,
+    });
   }, [effectiveYearFilter, prepScope]);
 
   async function createNewPaper() {
@@ -145,7 +130,13 @@ export default function TeacherHomePage() {
   }
 
   return (
-    <div className={mainPageClassName}>
+    <div
+      className={`${mainPageClassName} transition-colors duration-300 ${
+        prepScope === "dp1"
+          ? "rounded-3xl border border-[#e2d5ff] bg-gradient-to-br from-[#fdfbff] via-[#faf6ff] to-[#f5f7ff]"
+          : ""
+      }`}
+    >
       <PaperBankPageHeader
         eyebrow="Teacher"
         title="Shared paper bank"
@@ -172,7 +163,13 @@ export default function TeacherHomePage() {
           {error}
         </p>
       )}
-      <section className="mb-4 rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
+      <section
+        className={`mb-4 rounded-2xl border-2 p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)] transition-colors ${
+          prepScope === "dp1"
+            ? "border-[#d9c6ff] bg-gradient-to-br from-white via-[#fdfaff] to-[#f8f2ff]"
+            : "border-[var(--duo-border)] bg-white"
+        }`}
+      >
         <h2 className="mb-3 text-sm font-extrabold text-[var(--duo-text)]">Create paper</h2>
         <input
           value={title}
@@ -224,7 +221,9 @@ export default function TeacherHomePage() {
             id="teacher-paper-year-filter"
             value={effectiveYearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
-            className="w-full rounded-xl border-2 border-[var(--duo-border)] bg-white px-3 py-2 text-sm font-bold"
+            className={`w-full rounded-xl border-2 px-3 py-2 text-sm font-bold ${
+              prepScope === "dp1" ? "border-[#d7c1ff] bg-[#fcf8ff]" : "border-[var(--duo-border)] bg-white"
+            }`}
           >
             <option value="all">All years</option>
             {availableYears.map((y) => (
@@ -238,7 +237,11 @@ export default function TeacherHomePage() {
           <Link
             key={paper.id}
             href={`/teacher/${paper.id}`}
-            className="block rounded-2xl border-2 border-[var(--duo-border)] bg-white p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]"
+            className={`block rounded-2xl border-2 p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)] transition-colors ${
+              prepScope === "dp1"
+                ? "border-[#d9c6ff] bg-gradient-to-br from-white via-[#fdfaff] to-[#f8f2ff]"
+                : "border-[var(--duo-border)] bg-white"
+            }`}
           >
             <p className="text-base font-extrabold text-[var(--duo-text)]">
               {paper.year} {paper.session}
