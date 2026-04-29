@@ -21,16 +21,25 @@ const focusDp1 =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]";
 
 export function PaperModeToggle({ value, onChange, disabled, summaryText, className }: PaperModeToggleProps) {
+  const isDp1 = value === "dp1";
   const slideStyle: CSSProperties = {
-    transform: value === "all" ? "translate3d(0, 0, 0)" : "translate3d(calc(100% + 0.375rem), 0, 0)",
+    transform: isDp1 ? "translate3d(calc(100% + 0.375rem), 0, 0)" : "translate3d(0, 0, 0)",
     transition: `transform 320ms ${easeSegment}, background-color 320ms ${easeSegment}, box-shadow 320ms ${easeSegment}`,
   };
 
   return (
     <div
-      className={`w-full max-w-[28rem] flex flex-col gap-3 p-0 ${className ?? ""}`}
+      className={`w-full max-w-[28rem] flex flex-col gap-3 rounded-2xl border p-3 transition-colors ${
+        isDp1
+          ? "border-[#d9c4ff] bg-gradient-to-br from-[#fbf8ff] via-[#f7f1ff] to-[#f2ecff]"
+          : "border-[var(--duo-border)]/65 bg-gradient-to-br from-white via-[#fbfcff] to-[#f5f8ff]"
+      } ${className ?? ""}`}
     >
-      <p className="text-center text-[11px] font-extrabold uppercase tracking-[0.22em] text-[var(--duo-text-muted)]/80">
+      <p
+        className={`text-center text-[11px] font-extrabold uppercase tracking-[0.22em] ${
+          isDp1 ? "text-[#6f45b5]" : "text-[var(--duo-text-muted)]/80"
+        }`}
+      >
         Paper mode
       </p>
 
@@ -78,10 +87,19 @@ export function PaperModeToggle({ value, onChange, disabled, summaryText, classN
         </div>
       </div>
 
-      <p className="text-center text-[13px] font-medium leading-relaxed text-[var(--duo-text-muted)]/90">
+      <p
+        className={`text-center text-[13px] font-medium leading-relaxed ${
+          isDp1 ? "text-[#6f45b5]" : "text-[var(--duo-text-muted)]/90"
+        }`}
+      >
         {summaryText ??
           (value === "dp1" ? "Showing only DP1 EOY Exam Prep papers." : "Showing all draft and published papers.")}
       </p>
+      {isDp1 && (
+        <div className="mx-auto inline-flex items-center rounded-full border border-[#b996f7] bg-[#efe6ff] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#6c3fb8]">
+          DP1 mode active
+        </div>
+      )}
     </div>
   );
 }

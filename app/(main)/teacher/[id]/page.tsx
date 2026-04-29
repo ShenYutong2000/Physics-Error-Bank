@@ -45,11 +45,57 @@ type PaperQuestionKeyRow = {
   theme: string;
 };
 
+type ParsedQuestionsResult = {
+  questions: Array<{ number: number; correctAnswer: ChoiceOption; theme: string }>;
+  error: string | null;
+};
+
 function questionsToTextareaLines(questions: PaperQuestionKeyRow[]): string {
   if (questions.length === 0) return "";
   return questions
     .map((q) => `${q.number},${q.correctAnswer},${paperThemeToUploadToken(q.theme)}`)
     .join("\n");
+}
+
+function parseQuestionsText(questionsText: string): ParsedQuestionsResult {
+  const lines = questionsText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const seen = new Set<number>();
+  const parsed: Array<{ number: number; correctAnswer: ChoiceOption; theme: string }> = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const parts = line.split(",").map((x) => x.trim());
+    if (parts.length !== 3) {
+      return {
+        questions: [],
+        error: `Line ${i + 1}: use "questionNumber,correctAnswer,themeCode".`,
+      };
+    }
+    const questionNumber = Number(parts[0]);
+    const correctAnswer = parts[1].toUpperCase();
+    const theme = parts[2] ?? "";
+    if (!Number.isInteger(questionNumber) || questionNumber < 1) {
+      return { questions: [], error: `Line ${i + 1}: question number must be a positive integer.` };
+    }
+    if (seen.has(questionNumber)) {
+      return { questions: [], error: `Line ${i + 1}: duplicate question number ${questionNumber}.` };
+    }
+    seen.add(questionNumber);
+    if (!["A", "B", "C", "D"].includes(correctAnswer)) {
+      return { questions: [], error: `Line ${i + 1}: answer must be A, B, C, or D.` };
+    }
+    if (!theme) {
+      return { questions: [], error: `Line ${i + 1}: theme is required.` };
+    }
+    parsed.push({
+      number: questionNumber,
+      correctAnswer: correctAnswer as ChoiceOption,
+      theme,
+    });
+  }
+  return { questions: parsed, error: null };
 }
 
 type AnalyticsResponse = {
@@ -173,21 +219,7 @@ export default function TeacherPaperDetailPage() {
     await refreshQuestionsFromServer();
   }
 
-  const parsedQuestions = useMemo(() => {
-    const lines = questionsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    return lines.map((line) => {
-      const parts = line.split(",").map((x) => x.trim());
-      const n = parts[0];
-      const answerRaw = parts[1];
-      const theme = parts[2] ?? "";
-      const answer = answerRaw?.toUpperCase() as ChoiceOption;
-      return {
-        number: Number(n),
-        correctAnswer: answer,
-        theme,
-      };
-    });
-  }, [questionsText]);
+  const parsedQuestionsResult = useMemo(() => parseQuestionsText(questionsText), [questionsText]);
 
   const sortMasteryRows = useCallback(
     (rows: TagMasteryRow[]): TagMasteryRow[] =>
@@ -240,6 +272,10 @@ export default function TeacherPaperDetailPage() {
   const classMasteryByTag = masteryMap(displayedOverallMasteryRows);
 
   async function saveQuestions() {
+    if (parsedQuestionsResult.error) {
+      setError(parsedQuestionsResult.error);
+      return;
+    }
     setSavingQuestions(true);
     setError(null);
     const r = await apiFetchJson<{ ok: true }>(
@@ -248,7 +284,7 @@ export default function TeacherPaperDetailPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questions: parsedQuestions.map((q) => ({
+          questions: parsedQuestionsResult.questions.map((q) => ({
             number: q.number,
             correctAnswer: q.correctAnswer,
             theme: q.theme,
@@ -380,6 +416,11 @@ export default function TeacherPaperDetailPage() {
         <p className="mt-1 text-[11px] font-bold text-[var(--duo-text-muted)]">
           Themes: {PAPER_THEME_LABELS.join(" · ")}
         </p>
+        {parsedQuestionsResult.error && (
+          <p className="mt-2 rounded-lg border-2 border-[#ff4b4b] bg-[#ffe8e8] px-2 py-1 text-[11px] font-bold text-[#c00]">
+            {parsedQuestionsResult.error}
+          </p>
+        )}
         {questionsKeyLoadState === "loading" && (
           <p className="mt-3 text-xs font-bold text-[var(--duo-text-muted)]">Loading answer key…</p>
         )}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireTeacher } from "@/lib/api-route-guards";
 import { getPaperQuestionsWithAnswers, upsertPaperQuestions } from "@/lib/papers-repo";
 import { normalizePaperTheme } from "@/lib/paper-themes";
@@ -55,10 +56,15 @@ export async function PUT(
   if (questions.length === 0) {
     return NextResponse.json({ error: "questions is required." }, { status: 400 });
   }
+  const seenQuestionNumbers = new Set<number>();
   for (const q of questions) {
     if (!Number.isInteger(q.number) || q.number < 1) {
       return NextResponse.json({ error: "question number must be a positive integer." }, { status: 400 });
     }
+    if (seenQuestionNumbers.has(q.number)) {
+      return NextResponse.json({ error: `Duplicate question number: ${q.number}.` }, { status: 400 });
+    }
+    seenQuestionNumbers.add(q.number);
     if (!["A", "B", "C", "D"].includes(q.correctAnswer)) {
       return NextResponse.json({ error: "correctAnswer must be A/B/C/D." }, { status: 400 });
     }
@@ -80,6 +86,14 @@ export async function PUT(
     );
     return NextResponse.json({ ok: true, questionCount: questions.length });
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      if (e.code === "P2025") {
+        return NextResponse.json({ error: "Paper not found." }, { status: 404 });
+      }
+      if (e.code === "P2002") {
+        return NextResponse.json({ error: "Duplicate question number detected in this paper." }, { status: 400 });
+      }
+    }
     const msg = e instanceof Error ? e.message : "Failed to update questions.";
     if (msg.includes("Theme") || msg.includes("theme")) {
       return NextResponse.json({ error: msg }, { status: 400 });
