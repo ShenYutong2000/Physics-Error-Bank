@@ -59,7 +59,7 @@ export function StudentStatsSection({
         <h2 className="text-sm font-extrabold text-[var(--duo-text)]">Your learning snapshot</h2>
         <p className="mt-1 text-xs font-bold text-[#6b5a95]">
           {prepScope === "dp1"
-            ? "Quick view of your DP1 EOY (Themes A-C) mastery bands and what to revise first."
+            ? "Quick view of your DP1 EOY (Themes A-C scoring) mastery bands and what to revise first."
             : "Quick view of current theme mastery bands and what to revise first."}
         </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -99,7 +99,9 @@ export function StudentStatsSection({
         <div className="rounded-2xl border-2 border-[#b6d4fe] bg-gradient-to-br from-[#eef6ff] via-white to-[#f6faff] p-4 shadow-[0_4px_0_0_rgba(0,0,0,0.06)]">
           <h2 className="mb-1 text-sm font-extrabold text-[var(--duo-text)]">Class theme mastery (baseline)</h2>
           <p className="mb-3 text-xs font-bold text-[#5c6b7a]">
-            {prepScope === "dp1" ? "Class aggregate across DP1 EOY papers only." : "Class aggregate across all published papers."}
+            {prepScope === "dp1"
+              ? "Class aggregate across DP1 EOY papers only."
+              : "Class aggregate across all published papers."}
           </p>
           {prepScope === "dp1" && (
             <span className="mb-2 inline-flex rounded-full border-2 border-[#7d4cc9] bg-[#f3edff] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#5f4f8f]">

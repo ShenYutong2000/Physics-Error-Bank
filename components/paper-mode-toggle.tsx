@@ -93,7 +93,9 @@ export function PaperModeToggle({ value, onChange, disabled, summaryText, classN
         }`}
       >
         {summaryText ??
-          (value === "dp1" ? "Showing only DP1 EOY Exam Prep papers." : "Showing all draft and published papers.")}
+          (value === "dp1"
+            ? "Showing only DP1 EOY Exam Prep papers (scoring/mastery use Themes A-C)."
+            : "Showing all draft and published papers.")}
       </p>
       {isDp1 && (
         <div className="mx-auto inline-flex items-center rounded-full border border-[#b996f7] bg-[#efe6ff] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#6c3fb8]">
