@@ -215,6 +215,8 @@ export function usePaperStatsData(variant: "student" | "teacher") {
     () => normalizeYearFilter(teacherYearFilter, teacherAvailableYears),
     [teacherAvailableYears, teacherYearFilter],
   );
+  const isStudentYearDomainReady = variant !== "student" || data !== null;
+  const isTeacherYearDomainReady = variant !== "teacher" || teacherData.classData !== null;
   const displayedStudentPapers = useMemo(() => {
     const papers = [...(data?.papers ?? [])].filter((p) =>
       effectiveStudentYearFilter === "all" ? true : String(p.paper.year) === effectiveStudentYearFilter,
@@ -242,23 +244,38 @@ export function usePaperStatsData(variant: "student" | "teacher") {
   useEffect(() => {
     if (variant !== "student") return;
     replaceUrlWithQuery({
-      year: effectiveStudentYearFilter === "all" ? null : effectiveStudentYearFilter,
+      year:
+        !isStudentYearDomainReady
+          ? studentYearFilter === "all"
+            ? null
+            : studentYearFilter
+          : effectiveStudentYearFilter === "all"
+            ? null
+            : effectiveStudentYearFilter,
       sort: studentPaperSort === "risk_high" ? null : studentPaperSort,
       prep: prepScope === "all" ? null : prepScope,
     });
-  }, [effectiveStudentYearFilter, prepScope, studentPaperSort, variant]);
+  }, [effectiveStudentYearFilter, isStudentYearDomainReady, prepScope, studentPaperSort, studentYearFilter, variant]);
 
   useEffect(() => {
     if (variant !== "teacher") return;
     replaceUrlWithQuery({
-      year: effectiveTeacherYearFilter === "all" ? null : effectiveTeacherYearFilter,
+      year:
+        !isTeacherYearDomainReady
+          ? teacherYearFilter === "all"
+            ? null
+            : teacherYearFilter
+          : effectiveTeacherYearFilter === "all"
+            ? null
+            : effectiveTeacherYearFilter,
       studentId: studentId.trim() ? studentId.trim() : null,
       prep: prepScope === "all" ? null : prepScope,
     });
-  }, [effectiveTeacherYearFilter, prepScope, studentId, variant]);
+  }, [effectiveTeacherYearFilter, isTeacherYearDomainReady, prepScope, studentId, teacherYearFilter, variant]);
 
   useEffect(() => {
     if (variant !== "student") return;
+    if (!isStudentYearDomainReady) return;
     if (!shouldAutoResetYearFilter(studentYearFilter, effectiveStudentYearFilter)) {
       const clearTimer = window.setTimeout(() => setFilterNotice(null), 0);
       return () => window.clearTimeout(clearTimer);
@@ -272,10 +289,11 @@ export function usePaperStatsData(variant: "student" | "teacher") {
       window.clearTimeout(showTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [effectiveStudentYearFilter, studentYearFilter, variant]);
+  }, [effectiveStudentYearFilter, isStudentYearDomainReady, studentYearFilter, variant]);
 
   useEffect(() => {
     if (variant !== "teacher") return;
+    if (!isTeacherYearDomainReady) return;
     if (!shouldAutoResetYearFilter(teacherYearFilter, effectiveTeacherYearFilter)) {
       const clearTimer = window.setTimeout(() => setFilterNotice(null), 0);
       return () => window.clearTimeout(clearTimer);
@@ -289,7 +307,7 @@ export function usePaperStatsData(variant: "student" | "teacher") {
       window.clearTimeout(showTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [effectiveTeacherYearFilter, teacherYearFilter, variant]);
+  }, [effectiveTeacherYearFilter, isTeacherYearDomainReady, teacherYearFilter, variant]);
 
   const onTeacherStudentChange = (next: string) => {
     setStudentId(next);
