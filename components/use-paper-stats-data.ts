@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "@/lib/api-client";
+import { incrementLocalCounter } from "@/lib/client-telemetry";
 import { replaceUrlWithQuery } from "@/lib/client-url";
 import {
   getYearResetNotice,
@@ -258,7 +259,11 @@ export function usePaperStatsData(variant: "student" | "teacher") {
 
   useEffect(() => {
     if (variant !== "student") return;
-    if (!shouldAutoResetYearFilter(studentYearFilter, effectiveStudentYearFilter)) return;
+    if (!shouldAutoResetYearFilter(studentYearFilter, effectiveStudentYearFilter)) {
+      const clearTimer = window.setTimeout(() => setFilterNotice(null), 0);
+      return () => window.clearTimeout(clearTimer);
+    }
+    incrementLocalCounter("paperStats.invalidYearReset.student");
     const syncTimer = window.setTimeout(() => setStudentYearFilter(effectiveStudentYearFilter), 0);
     const showTimer = window.setTimeout(() => setFilterNotice(getYearResetNotice()), 0);
     const hideTimer = window.setTimeout(() => setFilterNotice(null), 2200);
@@ -271,7 +276,11 @@ export function usePaperStatsData(variant: "student" | "teacher") {
 
   useEffect(() => {
     if (variant !== "teacher") return;
-    if (!shouldAutoResetYearFilter(teacherYearFilter, effectiveTeacherYearFilter)) return;
+    if (!shouldAutoResetYearFilter(teacherYearFilter, effectiveTeacherYearFilter)) {
+      const clearTimer = window.setTimeout(() => setFilterNotice(null), 0);
+      return () => window.clearTimeout(clearTimer);
+    }
+    incrementLocalCounter("paperStats.invalidYearReset.teacher");
     const syncTimer = window.setTimeout(() => setTeacherYearFilter(effectiveTeacherYearFilter), 0);
     const showTimer = window.setTimeout(() => setFilterNotice(getYearResetNotice()), 0);
     const hideTimer = window.setTimeout(() => setFilterNotice(null), 2200);
