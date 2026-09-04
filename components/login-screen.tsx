@@ -213,16 +213,18 @@ export function LoginScreen({ showDevHint }: Props) {
 
   useEffect(() => {
     if (mode !== "login") return;
-    const panel = panelRef.current;
-    if (!panel) return;
 
     function measure() {
+      const panel = panelRef.current;
+      if (!panel) return;
       const height = panel.getBoundingClientRect().height;
       setLoginPanelHeight(height);
       sessionStorage.setItem("slide-panel-height", String(height));
     }
 
     measure();
+    const panel = panelRef.current;
+    if (!panel) return;
     const observer = new ResizeObserver(measure);
     observer.observe(panel);
     return () => observer.disconnect();
