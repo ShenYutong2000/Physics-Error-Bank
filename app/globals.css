@@ -349,7 +349,7 @@ body {
 }
 
 .nodeck-planet {
-  --planet-size: clamp(422px, 52.8vw, 651px);
+  --planet-size: clamp(365px, 45.6vw, 562px);
   --planet-anchor: clamp(461px, 57.6vw, 710px);
   position: absolute;
   left: calc(var(--planet-anchor) * 0.3 - var(--planet-size) / 2);
