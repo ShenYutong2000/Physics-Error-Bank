@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Cherry_Bomb_One, Nunito } from "next/font/google";
 import "./globals.css";
 
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
   weight: ["500", "700", "800", "900"],
+});
+
+const cherryBomb = Cherry_Bomb_One({
+  variable: "--font-title",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${nunito.variable} h-full antialiased`}>
+    <html lang="en" className={`${nunito.variable} ${cherryBomb.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans text-[var(--duo-text)]">{children}</body>
     </html>
   );
